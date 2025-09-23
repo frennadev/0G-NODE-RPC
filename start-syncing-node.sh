@@ -18,13 +18,16 @@ mkdir -p $DATA_DIR/0g-home/0gchaind-home/config
 mkdir -p $DATA_DIR/0g-home/geth-home
 mkdir -p $DATA_DIR/0g-home/log
 
-echo "🔧 Step 1: Initialize Geth (Execution Layer)"
-if [ ! -f "$DATA_DIR/0g-home/geth-home/geth/chaindata/CURRENT" ]; then
-    ./bin/geth init --datadir $DATA_DIR/0g-home/geth-home ./geth-genesis.json
-    echo "✅ Geth initialized successfully"
-else
-    echo "✅ Geth already initialized"
+echo "🔧 Step 1: Initialize Geth (Execution Layer) with correct state scheme"
+# Remove existing database to avoid state scheme conflicts
+if [ -d "$DATA_DIR/0g-home/geth-home/geth" ]; then
+    echo "🗑️ Removing existing database to fix state scheme..."
+    rm -rf $DATA_DIR/0g-home/geth-home/geth
 fi
+
+# Initialize with hash state scheme for archive mode
+./bin/geth init --state.scheme=hash --datadir $DATA_DIR/0g-home/geth-home ./geth-genesis.json
+echo "✅ Geth initialized with hash state scheme"
 
 echo "🔧 Step 2: Initialize 0gchaind (Consensus Layer)"
 if [ ! -f "$DATA_DIR/0g-home/0gchaind-home/config/node_key.json" ]; then
@@ -82,14 +85,14 @@ echo "🔗 Step 5: Start 0gchaind (Consensus Layer) for Peer Discovery"
 echo "⏳ Waiting for consensus layer to discover peers..."
 sleep 30
 
-echo "⚡ Step 6: Start Geth (Execution Layer) with Sync"
+echo "⚡ Step 6: Start Geth (Execution Layer) with Fast Sync"
 ./bin/geth \
     --datadir $DATA_DIR/0g-home/geth-home \
     --networkid 16661 \
     --nat extip:$NODE_IP \
     --authrpc.jwtsecret jwt.hex \
-    --syncmode full \
-    --gcmode archive \
+    --state.scheme=hash \
+    --syncmode snap \
     --http \
     --http.addr "0.0.0.0" \
     --http.port 26657 \
@@ -150,8 +153,8 @@ while true; do
             --networkid 16661 \
             --nat extip:$NODE_IP \
             --authrpc.jwtsecret jwt.hex \
-            --syncmode full \
-            --gcmode archive \
+            --state.scheme=hash \
+            --syncmode snap \
             --http \
             --http.addr "0.0.0.0" \
             --http.port 26657 \
