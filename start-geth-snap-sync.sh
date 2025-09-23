@@ -39,7 +39,7 @@ cleanup() {
 # Set up signal handlers
 trap cleanup SIGTERM SIGINT
 
-echo "⚡ Starting Geth with Aggressive Snap Sync"
+echo "⚡ Starting Geth with Aggressive Snap Sync + Enhanced Peer Discovery"
 ./bin/geth \
     --datadir $DATA_DIR/geth-home \
     --networkid 16661 \
@@ -51,6 +51,11 @@ echo "⚡ Starting Geth with Aggressive Snap Sync"
     --cache=4096 \
     --maxpeers=50 \
     --bootnodes="enode://2bf74c837a98c94ad0fa8f5c58a428237d2040f9269fe622c3dbe4fef68141c28e2097d7af6ebaa041194257543dc112514238361a6498f9a38f70fd56493f96@8.221.140.134:30303" \
+    --discovery.port=30303 \
+    --port=30303 \
+    --nodiscover=false \
+    --v5disc \
+    --netrestrict="0.0.0.0/0" \
     --http \
     --http.addr "0.0.0.0" \
     --http.port 26657 \
@@ -103,6 +108,11 @@ while true; do
             --cache=4096 \
             --maxpeers=50 \
             --bootnodes="enode://2bf74c837a98c94ad0fa8f5c58a428237d2040f9269fe622c3dbe4fef68141c28e2097d7af6ebaa041194257543dc112514238361a6498f9a38f70fd56493f96@8.221.140.134:30303" \
+            --discovery.port=30303 \
+            --port=30303 \
+            --nodiscover=false \
+            --v5disc \
+            --netrestrict="0.0.0.0/0" \
             --http \
             --http.addr "0.0.0.0" \
             --http.port 26657 \
