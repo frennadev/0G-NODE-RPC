@@ -10,12 +10,12 @@ services:
       - key: NODE_NAME
         value: render-0g-node
       - key: PORT
-        value: 80
+        value: 8545
     disk:
       name: og-node-data
       mountPath: /data
       sizeGB: 100 # Adjust based on your needs (max 1000GB on Pro plan)
-    healthCheckPath: /health
+    healthCheckPath: /
     numInstances: 1
     scaling:
       minInstances: 1

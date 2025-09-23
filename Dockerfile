@@ -1,4 +1,4 @@
-# 0G Chain Node Dockerfile
+# 0G Chain Geth-Only Node Dockerfile
 FROM ubuntu:22.04
 
 # Install dependencies
@@ -6,8 +6,6 @@ RUN apt-get update && apt-get install -y \
     curl \
     jq \
     ca-certificates \
-    nginx \
-    supervisor \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app directory
@@ -16,35 +14,29 @@ WORKDIR /app
 # Copy the entire aristotle package
 COPY aristotle-v1.0.0/ ./
 
-# Copy startup script, nginx config, and supervisor config
-COPY start-node.sh ./
-COPY nginx.conf /etc/nginx/nginx.conf
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-RUN chmod +x start-node.sh
+# Copy startup script
+COPY start-geth-only.sh ./
+RUN chmod +x start-geth-only.sh
 
 # Set binary permissions
-RUN chmod +x ./bin/geth ./bin/0gchaind
+RUN chmod +x ./bin/geth
 
 # Create data directory structure
-RUN mkdir -p /data/0g-home/log \
-    && mkdir -p /data/0g-home/0gchaind-home/data \
-    && mkdir -p /data/0g-home/0gchaind-home/config \
-    && mkdir -p /data/0g-home/geth-home
+RUN mkdir -p /data/geth-home
 
-# Copy configuration to data directory
-RUN cp -r 0g-home/* /data/0g-home/
+# Copy geth configuration
+RUN cp -r 0g-home/geth-home/* /data/geth-home/ || true
 
-# Expose ports
-EXPOSE 80 8545 8546 26656 26657 30303
+# Expose Geth ports
+EXPOSE 8545 8546 30303
 
 # Set environment variables
 ENV DATA_DIR="/data"
-ENV NODE_NAME="render-0g-node"
+ENV NODE_NAME="render-geth-node"
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:26657/health || exit 1
+# Health check for Geth
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f -X POST http://localhost:8545 -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' || exit 1
 
-# Create required directories and start supervisor
-RUN mkdir -p /var/log/supervisor /var/log/nginx
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+# Start Geth only
+CMD ["./start-geth-only.sh"]

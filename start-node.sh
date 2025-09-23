@@ -82,11 +82,23 @@ sleep 10
 
 # Start Geth in background
 echo "⚡ Starting Geth (Execution Layer)..."
+echo "📍 Geth command: ./bin/geth --config geth-config.toml --nat extip:$NODE_IP --datadir $DATA_DIR/0g-home/geth-home --networkid 16661"
 ./bin/geth \
     --config geth-config.toml \
     --nat extip:$NODE_IP \
     --datadir $DATA_DIR/0g-home/geth-home \
     --networkid 16661 > $DATA_DIR/0g-home/log/geth.log 2>&1 &
+
+# Wait for Geth to start
+sleep 5
+echo "🔍 Checking if Geth is running..."
+if pgrep -f "geth" > /dev/null; then
+    echo "✅ Geth process is running"
+else
+    echo "❌ Geth process not found!"
+    echo "📋 Geth log contents:"
+    cat $DATA_DIR/0g-home/log/geth.log || echo "No geth.log found"
+fi
 
 echo "🎉 0G Chain Node started successfully!"
 echo "📊 RPC Endpoints:"
