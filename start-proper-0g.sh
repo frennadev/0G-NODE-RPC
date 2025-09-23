@@ -83,18 +83,23 @@ echo "⏳ Waiting for 0gchaind to start..."
 sleep 15
 
 echo "⚡ Step 6: Start Geth (Execution Layer)"
+# Start Geth with explicit HTTP flags (config file doesn't enable HTTP by default)
 ./bin/geth \
-    --config geth-config.toml \
-    --nat extip:$NODE_IP \
     --datadir $DATA_DIR/0g-home/geth-home \
     --networkid 16661 \
+    --nat extip:$NODE_IP \
     --authrpc.jwtsecret jwt.hex \
     --http \
     --http.addr "0.0.0.0" \
     --http.port 8545 \
     --http.api "eth,net,web3,debug,txpool" \
     --http.corsdomain "*" \
-    --http.vhosts "*" > $DATA_DIR/0g-home/log/geth.log 2>&1 &
+    --http.vhosts "*" \
+    --ws \
+    --ws.addr "0.0.0.0" \
+    --ws.port 8546 \
+    --ws.api "eth,net,web3,debug,txpool" \
+    --ws.origins "*" > $DATA_DIR/0g-home/log/geth.log 2>&1 &
 
 # Wait for both to start
 echo "⏳ Waiting for both layers to start..."
@@ -155,17 +160,21 @@ while true; do
     if ! pgrep -f "geth" > /dev/null; then
         echo "❌ Geth died, restarting..."
         ./bin/geth \
-            --config geth-config.toml \
-            --nat extip:$NODE_IP \
             --datadir $DATA_DIR/0g-home/geth-home \
             --networkid 16661 \
+            --nat extip:$NODE_IP \
             --authrpc.jwtsecret jwt.hex \
             --http \
             --http.addr "0.0.0.0" \
             --http.port 8545 \
             --http.api "eth,net,web3,debug,txpool" \
             --http.corsdomain "*" \
-            --http.vhosts "*" > $DATA_DIR/0g-home/log/geth.log 2>&1 &
+            --http.vhosts "*" \
+            --ws \
+            --ws.addr "0.0.0.0" \
+            --ws.port 8546 \
+            --ws.api "eth,net,web3,debug,txpool" \
+            --ws.origins "*" > $DATA_DIR/0g-home/log/geth.log 2>&1 &
     fi
     
     sleep 30
