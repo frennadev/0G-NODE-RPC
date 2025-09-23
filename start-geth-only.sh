@@ -45,17 +45,7 @@ echo "📍 Geth command: ./bin/geth --config geth-config.toml --nat extip:$NODE_
     --config geth-config.toml \
     --nat extip:$NODE_IP \
     --datadir $DATA_DIR/geth-home \
-    --networkid 16661 \
-    --http \
-    --http.addr 0.0.0.0 \
-    --http.port 8545 \
-    --http.api eth,net,web3,debug,txpool \
-    --http.corsdomain "*" \
-    --ws \
-    --ws.addr 0.0.0.0 \
-    --ws.port 8546 \
-    --ws.api eth,net,web3,debug,txpool \
-    --ws.origins "*" > $DATA_DIR/log/geth.log 2>&1 &
+    --networkid 16661 > $DATA_DIR/log/geth.log 2>&1 &
 
 # Wait for Geth to start
 echo "⏳ Waiting for Geth to start..."
@@ -100,17 +90,7 @@ while true; do
             --config geth-config.toml \
             --nat extip:$NODE_IP \
             --datadir $DATA_DIR/geth-home \
-            --networkid 16661 \
-            --http \
-            --http.addr 0.0.0.0 \
-            --http.port 8545 \
-            --http.api eth,net,web3,debug,txpool \
-            --http.corsdomain "*" \
-            --ws \
-            --ws.addr 0.0.0.0 \
-            --ws.port 8546 \
-            --ws.api eth,net,web3,debug,txpool \
-            --ws.origins "*" > $DATA_DIR/log/geth.log 2>&1 &
+            --networkid 16661 > $DATA_DIR/log/geth.log 2>&1 &
     fi
     
     # Show sync status every 30 seconds
