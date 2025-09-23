@@ -15,28 +15,31 @@ WORKDIR /app
 COPY aristotle-v1.0.0/ ./
 
 # Copy startup script
-COPY start-geth-only.sh ./
-RUN chmod +x start-geth-only.sh
+COPY start-proper-0g.sh ./
+RUN chmod +x start-proper-0g.sh
 
 # Set binary permissions
-RUN chmod +x ./bin/geth
+RUN chmod +x ./bin/geth ./bin/0gchaind
 
 # Create data directory structure
-RUN mkdir -p /data/geth-home
+RUN mkdir -p /data/0g-home/0gchaind-home/data \
+    && mkdir -p /data/0g-home/0gchaind-home/config \
+    && mkdir -p /data/0g-home/geth-home \
+    && mkdir -p /data/0g-home/log
 
-# Copy geth configuration
-RUN cp -r 0g-home/geth-home/* /data/geth-home/ || true
+# Copy configuration to data directory
+RUN cp -r 0g-home/* /data/0g-home/
 
-# Expose Geth ports
-EXPOSE 8545 8546 30303
+# Expose both RPC ports
+EXPOSE 8545 8546 26656 26657 30303
 
 # Set environment variables
 ENV DATA_DIR="/data"
 ENV NODE_NAME="render-geth-node"
 
-# Health check for Geth
+# Health check for both layers
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f -X POST http://localhost:8545 -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' || exit 1
+    CMD curl -f http://localhost:26657/health && curl -f -X POST http://localhost:8545 -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' || exit 1
 
-# Start Geth only
-CMD ["./start-geth-only.sh"]
+# Start proper 0G node (both layers)
+CMD ["./start-proper-0g.sh"]
