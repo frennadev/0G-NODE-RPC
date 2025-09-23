@@ -15,8 +15,8 @@ WORKDIR /app
 COPY aristotle-v1.0.0/ ./
 
 # Copy startup script
-COPY start-syncing-node.sh ./
-RUN chmod +x start-syncing-node.sh
+COPY start-geth-snap-sync.sh ./
+RUN chmod +x start-geth-snap-sync.sh
 
 # Set binary permissions
 RUN chmod +x ./bin/geth ./bin/0gchaind
@@ -42,4 +42,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f -X POST http://localhost:26657 -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' || exit 1
 
 # Start syncing node (both layers)
-CMD ["./start-syncing-node.sh"]
+CMD ["./start-geth-snap-sync.sh"]
