@@ -10,7 +10,7 @@ services:
       - key: NODE_NAME
         value: render-0g-node
       - key: PORT
-        value: 8545
+        value: 26657
     disk:
       name: og-node-data
       mountPath: /data

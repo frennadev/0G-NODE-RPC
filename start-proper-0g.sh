@@ -82,16 +82,15 @@ echo "🔗 Step 5: Start 0gchaind (Consensus Layer)"
 echo "⏳ Waiting for 0gchaind to start..."
 sleep 15
 
-echo "⚡ Step 6: Start Geth (Execution Layer)"
-# Start Geth with explicit HTTP flags (config file doesn't enable HTTP by default)
+echo "⚡ Step 6: Start Geth (Execution Layer) on port 26657 for Render"
+# Start Geth on port 26657 since that's what Render expects
 ./bin/geth \
     --datadir $DATA_DIR/0g-home/geth-home \
     --networkid 16661 \
     --nat extip:$NODE_IP \
-    --authrpc.jwtsecret jwt.hex \
     --http \
     --http.addr "0.0.0.0" \
-    --http.port 8545 \
+    --http.port 26657 \
     --http.api "eth,net,web3,debug,txpool" \
     --http.corsdomain "*" \
     --http.vhosts "*" \
@@ -131,9 +130,9 @@ else
     echo "❌ Consensus RPC not responding"
 fi
 
-# Test execution layer
-if curl -s -X POST http://localhost:8545 -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' > /dev/null; then
-    echo "✅ Execution RPC (8545) is responding"
+# Test execution layer on port 26657
+if curl -s -X POST http://localhost:26657 -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' > /dev/null; then
+    echo "✅ Execution RPC (26657) is responding"
 else
     echo "❌ Execution RPC not responding"
 fi
