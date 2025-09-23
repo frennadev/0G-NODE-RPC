@@ -85,7 +85,7 @@ echo "🔗 Step 5: Start 0gchaind (Consensus Layer) for Peer Discovery"
 echo "⏳ Waiting for consensus layer to discover peers..."
 sleep 30
 
-echo "⚡ Step 6: Start Geth (Execution Layer) with Fast Sync"
+echo "⚡ Step 6: Start Geth (Execution Layer) with Snap Sync from Current Block"
 ./bin/geth \
     --datadir $DATA_DIR/0g-home/geth-home \
     --networkid 16661 \
@@ -93,6 +93,9 @@ echo "⚡ Step 6: Start Geth (Execution Layer) with Fast Sync"
     --authrpc.jwtsecret jwt.hex \
     --state.scheme=hash \
     --syncmode snap \
+    --snapshot=true \
+    --txlookuplimit=0 \
+    --cache=2048 \
     --http \
     --http.addr "0.0.0.0" \
     --http.port 26657 \
@@ -125,11 +128,12 @@ else
     tail -20 $DATA_DIR/0g-home/log/geth.log
 fi
 
-echo "🎉 0G Chain Node started - Beginning sync process!"
+echo "🎉 0G Chain Node started - Beginning FAST sync from current block!"
 echo "📊 RPC Endpoint: https://zerog-node-rpc.onrender.com/"
-echo "📈 Current target: Block 6,542,022"
+echo "📈 Target: Block 6,542,022 (snap sync - downloads state snapshot)"
+echo "⚡ Optimization: Skip historical blocks, sync from recent state"
 echo ""
-echo "⏳ Sync Status (this will take time):"
+echo "⏳ Sync Status (should be much faster):"
 
 # Monitor sync progress
 LAST_BLOCK=0
@@ -155,6 +159,9 @@ while true; do
             --authrpc.jwtsecret jwt.hex \
             --state.scheme=hash \
             --syncmode snap \
+            --snapshot=true \
+            --txlookuplimit=0 \
+            --cache=2048 \
             --http \
             --http.addr "0.0.0.0" \
             --http.port 26657 \
