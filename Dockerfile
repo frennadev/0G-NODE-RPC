@@ -6,6 +6,8 @@ RUN apt-get update && apt-get install -y \
     curl \
     jq \
     ca-certificates \
+    nginx \
+    supervisor \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app directory
@@ -14,8 +16,10 @@ WORKDIR /app
 # Copy the entire aristotle package
 COPY aristotle-v1.0.0/ ./
 
-# Copy startup script
+# Copy startup script, nginx config, and supervisor config
 COPY start-node.sh ./
+COPY nginx.conf /etc/nginx/nginx.conf
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 RUN chmod +x start-node.sh
 
 # Set binary permissions
@@ -31,7 +35,7 @@ RUN mkdir -p /data/0g-home/log \
 RUN cp -r 0g-home/* /data/0g-home/
 
 # Expose ports
-EXPOSE 8545 8546 26656 26657 30303
+EXPOSE 80 8545 8546 26656 26657 30303
 
 # Set environment variables
 ENV DATA_DIR="/data"
@@ -41,5 +45,6 @@ ENV NODE_NAME="render-0g-node"
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:26657/health || exit 1
 
-# Start the node
-CMD ["./start-node.sh"]
+# Create required directories and start supervisor
+RUN mkdir -p /var/log/supervisor /var/log/nginx
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
