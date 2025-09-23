@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: og-chain-node
+    env: docker
+    plan: pro # Required for resources
+    region: oregon # Choose your preferred region
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./
+    envVars:
+      - key: NODE_NAME
+        value: render-0g-node
+      - key: PORT
+        value: 26657
+    disk:
+      name: og-node-data
+      mountPath: /data
+      sizeGB: 100 # Adjust based on your needs (max 1000GB on Pro plan)
+    healthCheckPath: /health
+    numInstances: 1
+    scaling:
+      minInstances: 1
+      maxInstances: 1
+    resources:
+      cpu: 4000m # 4 CPU cores
+      memory: 16Gi # 16GB RAM (adjust based on plan)
+
+# Note: For full 0G node requirements (64GB RAM, 8 cores, 1TB storage)
+# you'll need Render's highest tier plan or consider using their
+# Private Services for custom resource allocation

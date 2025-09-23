@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  og-node:
+    build: .
+    container_name: og-chain-node
+    ports:
+      - "8545:8545"   # Geth JSON-RPC
+      - "8546:8546"   # Geth WebSocket
+      - "26657:26657" # Tendermint RPC
+      - "26656:26656" # P2P
+      - "30303:30303" # Geth P2P
+    volumes:
+      - og_data:/data
+    environment:
+      - NODE_NAME=local-0g-node
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:26657/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  og_data:
+    driver: local

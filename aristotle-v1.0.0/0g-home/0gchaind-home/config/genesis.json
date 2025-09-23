@@ -1,0 +1,91 @@
+{
+  "app_name": "0gchaind",
+  "app_version": "v1.2.0.rc1-118-g2e1c30669",
+  "genesis_time": "2025-08-19T15:01:49.679607111Z",
+  "chain_id": "0G-mainnet-aristotle",
+  "initial_height": 1,
+  "app_hash": null,
+  "app_state": {
+    "beacon": {
+      "fork_version": "0x05020000",
+      "deposits": [
+        {
+          "pubkey": "0x846b2cdd85725c16a1e1931656bb41c266c9a1da795a75ff218b9380f5e6a6c9a6dd5cfacdbb6dc492d34b730f9386bc",
+          "credentials": "0x01000000000000000000000081568b27b210538869f5659035ebf506d2fc3384",
+          "amount": "0x746a528800",
+          "signature": "0xb8a93959666a6a216077061993fb771527dcddd32a8a8e083220d0dafd08e92aa4be770535e01994bcc949ebd0c0aa0505c53a91fe21a42f22871c4c92262c7c715c94e260734685a977dbe756e69809dec695b5f90540269d298f2e5602fcf9",
+          "index": 0
+        },
+        {
+          "pubkey": "0x8a79b3b84014b7574e229e43ebc8b5fcde8bfb9a79082a000a023ddfc951c2c15d0cecc14cfe8498a3c9c671431d28f4",
+          "credentials": "0x0100000000000000000000008ee1af5b2791c7fa6065a02e4b579a9cc78388fb",
+          "amount": "0x746a528800",
+          "signature": "0x86078d1f441fdc7f8721c2fc87c068945d778244ae50a068c60407e2df1dba61a4dc7747152a0ab50f49915db02b952d0350d10a0bd9a2378675f08754eac863bb45c351942fadcefefee3871a0fcd99d0945ef6250c265d2d50b4e2774fb36c",
+          "index": 1
+        },
+        {
+          "pubkey": "0x8d73c9b5451a843edab20de7976bb0f570e0243b43ec120b653481d509db703c346b910b9b1815b903b4fdfe00c6831e",
+          "credentials": "0x010000000000000000000000712a30816a8756c8fdb78de63db55aa70d3cf3b4",
+          "amount": "0x746a528800",
+          "signature": "0x80590b6971fc60b8d9e988e236bd76846eb5fa3d71adf73017cdb7717609f587f3e3cb14db00a7ee9de5a6e81e846d84056c53b5928dc9cb9b786290051327d5728e69a6e406be841e545f06efce945a68924fb5fd41ac76301c254ad9277cdd",
+          "index": 2
+        },
+        {
+          "pubkey": "0xb8dd0a7db32a7ad0222d9d5ff11a951aeda9aa7387818256937f5903b94750b809c5fa6e843bd37f26b932247949884c",
+          "credentials": "0x010000000000000000000000cb8fb96dd0f60085c9b0ef4ffaea219caffbf972",
+          "amount": "0x746a528800",
+          "signature": "0xa42553a3fe7db8da6bc04af0254df034512e3edd503c8a3c430d03c2989be35fa646e26013865e070cde4d9da0361d0c06c6ea3eaebb84b11ba51f6ecc7dc6c868c7289b3d3637514867c71f50f9405aa520af522c52933b21abc93c95958672",
+          "index": 3
+        }
+      ],
+      "execution_payload_header": {
+        "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "feeRecipient": "0x0000000000000000000000000000000000000000",
+        "stateRoot": "0x5a2da642ae4622132c39887f267da66f596e158c2c69afef3955d7d7b90fbdaf",
+        "receiptsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+        "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "prevRandao": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "blockNumber": "0x0",
+        "gasLimit": "0x1c9c380",
+        "gasUsed": "0x0",
+        "timestamp": "0x0",
+        "extraData": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "baseFeePerGas": "1000000000",
+        "blockHash": "0x2a737bf359b94d227dff53ab20c68e38d08f095eedcd9d52e355156eaa681589",
+        "transactionsRoot": "0x7ffe241ea60187fdb0187bfa22de35d1f9bed7ab061d9401fd47e34a54fbede1",
+        "withdrawalsRoot": "0x792930bbd5baac43bcc798ee49aa8185ef76bb3b44ba62b91d86ae569e4bb535",
+        "blobGasUsed": "0x0",
+        "excessBlobGas": "0x0"
+      }
+    }
+  },
+  "consensus": {
+    "params": {
+      "block": {
+        "max_bytes": "104857600",
+        "max_gas": "10000000"
+      },
+      "evidence": {
+        "max_age_num_blocks": "100000",
+        "max_age_duration": "172800000000000",
+        "max_bytes": "1048576"
+      },
+      "validator": {
+        "pub_key_types": [
+          "bls12_381"
+        ]
+      },
+      "version": {
+        "app": "0"
+      },
+      "synchrony": {
+        "precision": "505000000",
+        "message_delay": "15000000000"
+      },
+      "feature": {
+        "vote_extensions_enable_height": "0",
+        "pbts_enable_height": "1"
+      }
+    }
+  }
+}
