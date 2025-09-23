@@ -127,7 +127,7 @@ fi
 
 echo "🎉 0G Chain Node started - Beginning sync process!"
 echo "📊 RPC Endpoint: https://zerog-node-rpc.onrender.com/"
-echo "📈 Current target: Block 6,541,048"
+echo "📈 Current target: Block 6,542,022"
 echo ""
 echo "⏳ Sync Status (this will take time):"
 
@@ -174,8 +174,8 @@ while true; do
         CURRENT_BLOCK=$((16#${CURRENT_BLOCK_HEX#0x}))
         
         if [ $CURRENT_BLOCK -gt $LAST_BLOCK ]; then
-            PROGRESS=$(echo "scale=4; $CURRENT_BLOCK * 100 / 6541048" | bc -l 2>/dev/null || echo "0")
-            echo "📈 Block: $CURRENT_BLOCK / 6,541,048 (${PROGRESS}%)"
+            PROGRESS=$(echo "scale=4; $CURRENT_BLOCK * 100 / 6542022" | bc -l 2>/dev/null || echo "0")
+            echo "📈 Block: $CURRENT_BLOCK / 6,542,022 (${PROGRESS}%)"
             LAST_BLOCK=$CURRENT_BLOCK
         fi
     fi
