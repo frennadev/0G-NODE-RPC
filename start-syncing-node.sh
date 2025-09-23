@@ -74,7 +74,7 @@ trap cleanup SIGTERM SIGINT
 
 echo "🔗 Step 5: Start 0gchaind (Consensus Layer) for Peer Discovery"
 ./bin/0gchaind start \
-    --rpc.laddr tcp://0.0.0.0:26657 \
+    --rpc.laddr tcp://0.0.0.0:26658 \
     --chaincfg.kzg.trusted-setup-path=kzg-trusted-setup.json \
     --chaincfg.engine.jwt-secret-path=jwt.hex \
     --chaincfg.block-store-service.enabled \
@@ -138,7 +138,7 @@ while true; do
     if ! pgrep -f "0gchaind" > /dev/null; then
         echo "❌ 0gchaind died, restarting..."
         ./bin/0gchaind start \
-            --rpc.laddr tcp://0.0.0.0:26657 \
+            --rpc.laddr tcp://0.0.0.0:26658 \
             --chaincfg.kzg.trusted-setup-path=kzg-trusted-setup.json \
             --chaincfg.engine.jwt-secret-path=jwt.hex \
             --chaincfg.block-store-service.enabled \
