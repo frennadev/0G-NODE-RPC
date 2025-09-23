@@ -21,8 +21,11 @@ RUN chmod +x start-node.sh
 # Set binary permissions
 RUN chmod +x ./bin/geth ./bin/0gchaind
 
-# Create data directory
-RUN mkdir -p /data/0g-home/log
+# Create data directory structure
+RUN mkdir -p /data/0g-home/log \
+    && mkdir -p /data/0g-home/0gchaind-home/data \
+    && mkdir -p /data/0g-home/0gchaind-home/config \
+    && mkdir -p /data/0g-home/geth-home
 
 # Copy configuration to data directory
 RUN cp -r 0g-home/* /data/0g-home/

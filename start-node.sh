@@ -18,10 +18,20 @@ if [ ! -f "$DATA_DIR/0g-home/geth-home/geth/chaindata/CURRENT" ]; then
     ./bin/geth init --datadir $DATA_DIR/0g-home/geth-home ./geth-genesis.json
 fi
 
+# Ensure directory structure exists
+mkdir -p $DATA_DIR/0g-home/0gchaind-home/data
+mkdir -p $DATA_DIR/0g-home/0gchaind-home/config
+mkdir -p $DATA_DIR/0g-home/geth-home
+mkdir -p $DATA_DIR/0g-home/log
+
 # Initialize 0gchaind keys if not already done
 if [ ! -f "$DATA_DIR/0g-home/0gchaind-home/config/node_key.json" ]; then
     echo "🔑 Generating node keys..."
     ./bin/0gchaind init $NODE_NAME --home $DATA_DIR/tmp
+    
+    # Ensure target directories exist
+    mkdir -p $DATA_DIR/0g-home/0gchaind-home/data
+    mkdir -p $DATA_DIR/0g-home/0gchaind-home/config
     
     # Copy keys to permanent location
     cp $DATA_DIR/tmp/data/priv_validator_state.json $DATA_DIR/0g-home/0gchaind-home/data/
