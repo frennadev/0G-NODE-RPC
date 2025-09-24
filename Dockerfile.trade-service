@@ -1,0 +1,50 @@
+# 0G Trade Streaming Service - Production Dockerfile
+FROM node:18-alpine
+
+# Install system dependencies
+RUN apk add --no-cache curl jq
+
+# Create app directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install Node.js dependencies
+RUN npm install --production
+
+# Copy application files
+COPY enhanced-trade-tracker.js ./
+COPY complete-trade-dashboard.html ./public/
+COPY TRADE_STREAMING_API.md ./docs/
+
+# Create directories
+RUN mkdir -p public docs logs
+
+# Move static files
+RUN mv complete-trade-dashboard.html public/index.html
+RUN mv TRADE_STREAMING_API.md docs/
+
+# Expose ports
+EXPOSE 6000 6001
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV RPC_URL=https://zerog-node-rpc.onrender.com/
+ENV PORT=6000
+ENV WS_PORT=6001
+ENV MAX_TOKENS=10
+ENV CACHE_SIZE=1000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:6000/health || exit 1
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S tradeservice -u 1001
+RUN chown -R tradeservice:nodejs /app
+USER tradeservice
+
+# Start the service
+CMD ["node", "enhanced-trade-tracker.js"]

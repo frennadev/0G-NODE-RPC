@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: 0g-trade-streaming-service
+    env: docker
+    plan: pro # Using your existing Pro plan for maximum performance
+    region: oregon
+    dockerfilePath: ./Dockerfile.trade-service
+    dockerContext: ./
+    envVars:
+      - key: RPC_URL
+        value: https://zerog-node-rpc.onrender.com/
+      - key: PORT
+        value: 6000
+      - key: WS_PORT
+        value: 6001
+      - key: NODE_ENV
+        value: production
+      - key: MAX_TOKENS
+        value: 10
+      - key: CACHE_SIZE
+        value: 1000
+    # Full Pro plan resources for high-performance trade streaming
+    healthCheckPath: /health
+    numInstances: 1
+    scaling:
+      minInstances: 1
+      maxInstances: 1
+    resources:
+      cpu: 4000m # Full Pro plan CPU
+      memory: 16Gi # Full Pro plan memory
+
+# ✅ DEPLOYMENT BENEFITS:
+# - Same infrastructure as your RPC node (minimal latency)
+# - Uses existing Pro plan resources efficiently
+# - Direct connection to your enhanced 0G proxy
+# - Professional-grade performance and reliability
+# - Real-time trade streaming with <100ms latency

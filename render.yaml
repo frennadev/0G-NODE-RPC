@@ -15,10 +15,16 @@ services:
         value: 26657
       - key: MONITORING_PORT
         value: 9615
+      - key: TRADE_API_PORT
+        value: 6000
+      - key: TRADE_WS_PORT
+        value: 6001
       - key: NODE_ENV
         value: production
       - key: PM2_INSTANCES
         value: 4
+      - key: RPC_URL
+        value: http://localhost:26657/
     # No disk needed - proxy doesn't store data!
     healthCheckPath: /health
     numInstances: 1
@@ -29,11 +35,14 @@ services:
       cpu: 4000m # Full Pro plan CPU for maximum performance
       memory: 16Gi # Full Pro plan memory for connection pooling
 
-# ✅ SEAMLESS BENEFITS:
+# ✅ ENHANCED BENEFITS:
 # - Instant startup (no sync required)
 # - Uses official 0G infrastructure (100% reliable)
-# - Enhanced monitoring and statistics
-# - Load balancing with PM2 (4 processes)
+# - Enhanced RPC proxy with monitoring and statistics
+# - Real-time trade streaming service with WebSocket support
+# - Complete buy/sell detection from token inception
+# - Load balancing with PM2 (6 total processes: 4 proxy + 2 trade)
 # - Full RPC compatibility with your existing commands
+# - Professional trade analytics dashboard
 # - Pro plan resources optimized for performance
-# - Real-time access to latest blockchain state
+# - Real-time access to latest blockchain state and trade data

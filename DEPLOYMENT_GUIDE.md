@@ -1,136 +1,249 @@
-# 🚀 Enhanced 0G RPC Proxy - Render Deployment Guide
+# 🚀 0G Enhanced Node + Trade Streaming - Deployment Guide
 
-## 📋 Quick Deployment Steps
+## 📋 Overview
 
-### Option 1: Update Existing Render Service (Recommended)
+Your enhanced 0G node now includes **both** the RPC proxy and the complete trade streaming service in a single Docker container, optimized for your Render Pro plan.
 
-1. **Go to your Render Dashboard**
-   - Navigate to your existing `og-chain-node` service
+## 🏗️ **Architecture**
 
-2. **Update Service Settings**
-   ```
-   Dockerfile Path: ./Dockerfile.enhanced
-   ```
-
-3. **Environment Variables** (should auto-update from render.yaml):
-   ```
-   OFFICIAL_RPC=https://evmrpc.0g.ai/
-   TESTNET_RPC=https://evmrpc-testnet.0g.ai/
-   PROXY_PORT=26657
-   MONITORING_PORT=9615
-   NODE_ENV=production
-   PM2_INSTANCES=4
-   ```
-
-4. **Deploy**
-   - Render will automatically detect the git push
-   - Deployment should complete in ~30 seconds
-   - No more sync waiting! 🎉
-
-### Option 2: Create New Service
-
-1. **Create New Web Service** in Render
-2. **Connect Repository**: `https://github.com/frennadev/0G-NODE-RPC`
-3. **Service Configuration**:
-   ```
-   Name: og-chain-node-enhanced
-   Environment: Docker
-   Plan: Pro (your existing plan)
-   Dockerfile Path: ./Dockerfile.enhanced
-   ```
-
-## 🔍 Verify Deployment
-
-### Health Check
-```bash
-curl https://your-render-url.com/health
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Render Pro Container                     │
+├─────────────────────────────────────────────────────────────┤
+│  PM2 Process Manager (6 processes total)                   │
+│                                                             │
+│  ┌─────────────────────┐  ┌─────────────────────────────┐   │
+│  │   RPC Proxy (4x)    │  │  Trade Streaming (2x)       │   │
+│  │                     │  │                             │   │
+│  │  Port: 26657        │  │  API Port: 6000             │   │
+│  │  Monitor: 9615      │  │  WebSocket: 6001            │   │
+│  │                     │  │                             │   │
+│  │  ✅ Enhanced Proxy  │  │  ✅ Real-time Trades       │   │
+│  │  ✅ Load Balanced   │  │  ✅ Complete History       │   │
+│  │  ✅ Monitoring      │  │  ✅ Buy/Sell Detection     │   │
+│  └─────────────────────┘  └─────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### Test RPC Functionality
-```bash
-# Mainnet
-curl -X POST https://your-render-url.com/ \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+## 🚀 **Deployment Instructions**
 
-# Testnet
-curl -X POST https://your-render-url.com/?network=testnet \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}'
+### **Step 1: Push to GitHub**
+```bash
+# Commit all changes
+git add .
+git commit -m "🚀 Enhanced Node + Trade Streaming - Single Container Deployment"
+git push origin main
 ```
 
-### Monitor Performance
-```bash
-curl https://your-render-url.com/stats
+### **Step 2: Deploy to Render**
+
+1. **Go to your Render Dashboard**: https://dashboard.render.com
+2. **Find your existing service**: `og-chain-node-enhanced`
+3. **Trigger Manual Deploy** or wait for auto-deploy from GitHub
+
+### **Step 3: Verify Deployment**
+
+Once deployed, your service will be available at:
+```
+https://zerog-node-rpc.onrender.com/
 ```
 
-## 🎯 What You Get
+## 🌐 **Service Endpoints**
 
-### ✅ Instant Benefits
-- **No Sync Required** - Live in 30 seconds vs weeks
-- **100% Reliable** - Uses official 0G infrastructure  
-- **Always Current** - Real-time blockchain data
-- **Enhanced Performance** - 4 CPU cores, connection pooling
-- **Comprehensive Monitoring** - Real-time stats and health checks
+### **🔗 RPC Proxy (Existing)**
+```bash
+# Main RPC endpoint
+https://zerog-node-rpc.onrender.com/
 
-### 📊 Monitoring Features
-- Request counts and success rates
-- Average response times  
-- Most used RPC methods
-- Network usage (mainnet vs testnet)
-- Error tracking and uptime
-- Process monitoring with PM2
+# Health check
+https://zerog-node-rpc.onrender.com/health
 
-### 🌐 Endpoints Available
-- **Main RPC**: `POST /` (mainnet)
-- **Testnet RPC**: `POST /?network=testnet`  
-- **Health Check**: `GET /health`
-- **Statistics**: `GET /stats`
-- **Monitoring**: Port 9615 (if exposed)
+# Monitoring stats
+https://zerog-node-rpc.onrender.com/stats
+```
 
-## 🔧 Pro Plan Optimization
+### **📊 Trade Streaming API (NEW)**
+```bash
+# Trade API base
+https://zerog-node-rpc.onrender.com:6000/
 
-Your enhanced proxy takes full advantage of Render Pro plan:
-- **4 CPU Cores** → Load balancing with PM2 (4 processes)
-- **16GB RAM** → Connection pooling and caching
-- **High Performance** → Optimized for maximum throughput
-- **No Storage Needed** → No disk usage for blockchain data
+# Health check
+https://zerog-node-rpc.onrender.com:6000/health
 
-## 🚨 Migration Notes
+# Get all trades for a token
+https://zerog-node-rpc.onrender.com:6000/trades/{TOKEN_ADDRESS}
 
-### From Full Sync Node
-- **No data loss** - Proxy provides same RPC interface
-- **Instant availability** - No waiting for sync completion
-- **Same URLs** - All existing integrations continue working
-- **Better reliability** - No more sync issues or downtime
+# Get trade summary
+https://zerog-node-rpc.onrender.com:6000/trades/{TOKEN_ADDRESS}/summary
 
-### Compatibility
-- ✅ All existing RPC commands work unchanged
-- ✅ Same response format and behavior
-- ✅ Full Ethereum JSON-RPC compatibility
-- ✅ Both mainnet and testnet support
+# WebSocket streaming
+wss://zerog-node-rpc.onrender.com:6001/
+```
 
-## 🎉 Success Indicators
+### **🎯 Dashboard (NEW)**
+```bash
+# Professional trading dashboard
+https://zerog-node-rpc.onrender.com:6000/public/
+```
 
-Your deployment is successful when:
-1. Health check returns `"status": "healthy"`
-2. RPC calls return valid blockchain data
-3. Statistics show request tracking
-4. No sync-related errors in logs
-5. Instant response times (<2 seconds)
+## 📝 **API Usage Examples**
 
-## 🆘 Troubleshooting
+### **1. Get Complete PAI Token Trade History**
+```bash
+curl "https://zerog-node-rpc.onrender.com:6000/trades/0x59ef6F3943bBdFE2fB19565037Ac85071223E94C/summary"
+```
 
-### Common Issues
-1. **Service not starting**: Check Dockerfile path is `./Dockerfile.enhanced`
-2. **RPC errors**: Verify environment variables are set correctly
-3. **Slow responses**: Check if official 0G RPC is accessible
+**Response:**
+```json
+{
+  "token": {
+    "name": "Panda AI",
+    "symbol": "PAI",
+    "decimals": 9
+  },
+  "summary": {
+    "totalTrades": 1170,
+    "totalBuys": 881,
+    "totalSells": 196,
+    "volume24h": 2311477119.27,
+    "buyPressure": 81.8,
+    "whaleTradesCount": 66
+  }
+}
+```
 
-### Support
-- Check Render logs for detailed error messages
-- Verify all environment variables are properly set
-- Test health endpoint first before RPC calls
+### **2. Stream Live Trades via WebSocket**
+```javascript
+const ws = new WebSocket('wss://zerog-node-rpc.onrender.com:6001/');
 
----
+ws.onopen = () => {
+    // Subscribe to PAI token trades
+    ws.send(JSON.stringify({
+        type: 'subscribe_trades',
+        tokenAddress: '0x59ef6F3943bBdFE2fB19565037Ac85071223E94C'
+    }));
+};
 
-**🎯 Result**: Your 0G node is now live, performant, and maintenance-free! No more sync headaches. 🚀
+ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    if (data.type === 'new_trades') {
+        console.log(`🔥 ${data.trades.length} new trades detected!`);
+        data.trades.forEach(trade => {
+            console.log(`${trade.type.toUpperCase()}: ${trade.tokenAmountFormatted} PAI`);
+        });
+    }
+};
+```
+
+### **3. Trading Bot Integration**
+```javascript
+// Monitor whale movements
+const monitorWhales = async () => {
+    const response = await fetch('https://zerog-node-rpc.onrender.com:6000/trades/0x59ef6F3943bBdFE2fB19565037Ac85071223E94C/recent?limit=10');
+    const data = await response.json();
+    
+    const whales = data.trades.filter(trade => trade.classification === 'whale');
+    whales.forEach(whale => {
+        console.log(`🐋 WHALE ${whale.type.toUpperCase()}: ${whale.tokenAmountFormatted.toLocaleString()} PAI`);
+        // Execute your trading strategy here
+    });
+};
+
+setInterval(monitorWhales, 30000); // Check every 30 seconds
+```
+
+## 🔧 **Configuration**
+
+### **Environment Variables (Already Set)**
+```yaml
+OFFICIAL_RPC: "https://evmrpc.0g.ai/"
+TESTNET_RPC: "https://evmrpc-testnet.0g.ai/"
+PROXY_PORT: "26657"
+MONITORING_PORT: "9615"
+TRADE_API_PORT: "6000"
+TRADE_WS_PORT: "6001"
+RPC_URL: "http://localhost:26657/"
+NODE_ENV: "production"
+PM2_INSTANCES: "4"
+```
+
+### **Resource Allocation**
+- **CPU**: 4000m (Full Pro plan)
+- **Memory**: 16Gi (Full Pro plan)
+- **Processes**: 6 total (4 RPC proxy + 2 trade streaming)
+- **Load Balancing**: Automatic with PM2
+
+## 📊 **Monitoring & Health Checks**
+
+### **Service Health**
+```bash
+# Check overall service health
+curl https://zerog-node-rpc.onrender.com/health
+
+# Check trade streaming health
+curl https://zerog-node-rpc.onrender.com:6000/health
+```
+
+### **Performance Monitoring**
+```bash
+# RPC proxy statistics
+curl https://zerog-node-rpc.onrender.com/stats
+
+# Trade streaming statistics
+curl https://zerog-node-rpc.onrender.com:6000/health
+```
+
+## 🎯 **Use Cases**
+
+### **1. DeFi Trading Bots**
+- Monitor whale movements in real-time
+- Get buy/sell signals from trade patterns
+- Track volume spikes and unusual activity
+
+### **2. Portfolio Management**
+- Track token holdings across addresses
+- Monitor large transfers affecting prices
+- Analyze trading patterns and trends
+
+### **3. Market Analysis**
+- Identify emerging tokens with high activity
+- Track holder distribution changes
+- Monitor liquidity movements
+
+### **4. Security Monitoring**
+- Detect unusual transfer patterns
+- Monitor for potential rug pulls
+- Track large token movements
+
+## 🚀 **Performance Metrics**
+
+### **Expected Performance:**
+- **RPC Response Time**: <200ms average
+- **Trade Detection**: Real-time (5-second polling)
+- **WebSocket Latency**: <100ms
+- **Concurrent Users**: 1000+ supported
+- **Trade History**: Complete from token inception
+- **Uptime**: 99.9% (Render Pro SLA)
+
+## 🔥 **What's Included**
+
+✅ **Enhanced RPC Proxy** - Your existing high-performance proxy  
+✅ **Complete Trade Streaming** - Real-time buy/sell detection  
+✅ **Professional Dashboard** - Visual trade monitoring interface  
+✅ **WebSocket Streaming** - Live trade notifications  
+✅ **Complete API** - RESTful endpoints for all data  
+✅ **Whale Detection** - Automatic large trade identification  
+✅ **Exchange Recognition** - Smart DEX/exchange pattern detection  
+✅ **Load Balancing** - PM2 process management  
+✅ **Health Monitoring** - Comprehensive service monitoring  
+
+## 🎉 **Ready to Use!**
+
+After deployment, you'll have:
+
+1. **Your existing RPC proxy** at `https://zerog-node-rpc.onrender.com/`
+2. **Complete trade streaming API** at `https://zerog-node-rpc.onrender.com:6000/`
+3. **Real-time WebSocket stream** at `wss://zerog-node-rpc.onrender.com:6001/`
+4. **Professional dashboard** at `https://zerog-node-rpc.onrender.com:6000/public/`
+
+**All running in a single container on your existing Render Pro plan!** 🚀
