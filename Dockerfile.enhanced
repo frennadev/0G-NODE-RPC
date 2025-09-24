@@ -17,6 +17,7 @@ COPY start-rpc-proxy.sh ./
 COPY rpc_proxy.py ./
 COPY enhanced-proxy-server.js ./
 COPY enhanced-trade-tracker.js ./
+COPY unified-service.js ./
 COPY ecosystem.config.js ./
 COPY package*.json ./
 COPY complete-trade-dashboard.html ./public/
@@ -51,10 +52,9 @@ ENV NODE_ENV="production"
 ENV PM2_INSTANCES="4"
 ENV RPC_URL="http://localhost:26657/"
 
-# Enhanced health check with both services
+# Enhanced health check for unified service
 HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:26657/health && \
-        curl -f http://localhost:6000/health && \
         curl -f -X POST http://localhost:26657 \
         -H "Content-Type: application/json" \
         -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' | \
