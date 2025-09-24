@@ -1,0 +1,37 @@
+# 0G Token Analytics Service
+FROM node:18-alpine
+
+# Install system dependencies
+RUN apk add --no-cache curl
+
+# Create app directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install Node.js dependencies
+RUN npm install --production
+
+# Copy application files
+COPY token-analytics-service.js ./
+COPY token-analytics-client.html ./public/
+
+# Create public directory for static files
+RUN mkdir -p public && mv token-analytics-client.html public/index.html
+
+# Expose ports
+EXPOSE 3000 3001
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV RPC_URL=https://zerog-node-rpc.onrender.com/
+ENV PORT=3000
+ENV WS_PORT=3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:3000/health || exit 1
+
+# Start the service
+CMD ["npm", "start"]

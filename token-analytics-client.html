@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>0G Token Analytics - Real-time Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .card h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.4em;
+        }
+        
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .input-group input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .token-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .info-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .info-item .label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        
+        .info-item .value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .transfers-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #e1e5e9;
+            border-radius: 8px;
+        }
+        
+        .transfer-item {
+            padding: 15px;
+            border-bottom: 1px solid #e1e5e9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .transfer-item:last-child {
+            border-bottom: none;
+        }
+        
+        .transfer-item.new {
+            background: #d1ecf1;
+            animation: highlight 2s ease-out;
+        }
+        
+        @keyframes highlight {
+            0% { background: #b3e5fc; }
+            100% { background: #d1ecf1; }
+        }
+        
+        .transfer-amount {
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .transfer-type {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .transfer-type.whale_movement {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .transfer-type.large_transfer {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .transfer-type.transfer {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .address {
+            font-family: monospace;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .logs {
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 14px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .input-group {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 0G Token Analytics</h1>
+            <p>Real-time Token Trading Data & Analytics</p>
+        </div>
+        
+        <div class="card">
+            <h3>🔗 Connection Status</h3>
+            <p>WebSocket: <span id="wsStatus" class="status disconnected">Disconnected</span></p>
+            <p>API: <span id="apiStatus" class="status disconnected">Checking...</span></p>
+        </div>
+        
+        <div class="card">
+            <h3>📊 Token Tracker</h3>
+            <div class="input-group">
+                <input type="text" id="tokenAddress" placeholder="Enter token contract address (0x...)" 
+                       value="0x59ef6F3943bBdFE2fB19565037Ac85071223E94C">
+                <button class="btn" onclick="subscribeToToken()">Track Token</button>
+                <button class="btn" onclick="getTokenAnalytics()">Get Analytics</button>
+            </div>
+        </div>
+        
+        <div class="grid">
+            <div class="card">
+                <h3>🪙 Token Information</h3>
+                <div id="tokenInfo" class="token-info">
+                    <div class="info-item">
+                        <div class="label">Name</div>
+                        <div class="value" id="tokenName">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="label">Symbol</div>
+                        <div class="value" id="tokenSymbol">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="label">Total Supply</div>
+                        <div class="value" id="tokenSupply">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="label">Decimals</div>
+                        <div class="value" id="tokenDecimals">-</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>📈 Trading Summary</h3>
+                <div id="tradingSummary" class="token-info">
+                    <div class="info-item">
+                        <div class="label">24h Transfers</div>
+                        <div class="value" id="transfers24h">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="label">24h Volume</div>
+                        <div class="value" id="volume24h">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="label">Whale Movements</div>
+                        <div class="value" id="whaleMovements">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="label">Unique Holders</div>
+                        <div class="value" id="uniqueHolders">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3>🔄 Real-time Transfers</h3>
+            <div id="transfersList" class="transfers-list">
+                <div style="padding: 20px; text-align: center; color: #666;">
+                    Subscribe to a token to see real-time transfers
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3>📝 Activity Logs</h3>
+            <div id="logs" class="logs"></div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let currentToken = null;
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAPIStatus();
+            connectWebSocket();
+        });
+        
+        // Check API status
+        async function checkAPIStatus() {
+            try {
+                const response = await fetch('http://localhost:3000/health');
+                const data = await response.json();
+                
+                document.getElementById('apiStatus').textContent = 'Connected';
+                document.getElementById('apiStatus').className = 'status connected';
+                
+                log(`✅ API Connected - ${data.trackedTokens} tokens tracked`);
+            } catch (error) {
+                document.getElementById('apiStatus').textContent = 'Disconnected';
+                document.getElementById('apiStatus').className = 'status disconnected';
+                log(`❌ API Connection failed: ${error.message}`);
+            }
+        }
+        
+        // Connect to WebSocket
+        function connectWebSocket() {
+            try {
+                ws = new WebSocket('ws://localhost:3001');
+                
+                ws.onopen = function() {
+                    document.getElementById('wsStatus').textContent = 'Connected';
+                    document.getElementById('wsStatus').className = 'status connected';
+                    log('🔗 WebSocket connected');
+                };
+                
+                ws.onclose = function() {
+                    document.getElementById('wsStatus').textContent = 'Disconnected';
+                    document.getElementById('wsStatus').className = 'status disconnected';
+                    log('🔌 WebSocket disconnected');
+                    
+                    // Reconnect after 3 seconds
+                    setTimeout(connectWebSocket, 3000);
+                };
+                
+                ws.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    handleWebSocketMessage(data);
+                };
+                
+                ws.onerror = function(error) {
+                    log(`❌ WebSocket error: ${error}`);
+                };
+                
+            } catch (error) {
+                log(`❌ WebSocket connection failed: ${error.message}`);
+            }
+        }
+        
+        // Handle WebSocket messages
+        function handleWebSocketMessage(data) {
+            switch (data.type) {
+                case 'connected':
+                    log(`🎉 Connected with client ID: ${data.clientId}`);
+                    break;
+                    
+                case 'subscribed':
+                    log(`📺 Subscribed to ${data.tokenInfo.symbol}`);
+                    updateTokenInfo(data.tokenInfo);
+                    break;
+                    
+                case 'new_transfers':
+                    log(`🔄 New transfers detected for ${data.data.token.symbol}`);
+                    updateTransfers(data.data.transfers);
+                    updateTradingSummary(data.data.summary);
+                    break;
+                    
+                case 'error':
+                    log(`❌ Error: ${data.message}`);
+                    break;
+            }
+        }
+        
+        // Subscribe to token
+        function subscribeToToken() {
+            const address = document.getElementById('tokenAddress').value.trim();
+            
+            if (!address || !address.startsWith('0x')) {
+                alert('Please enter a valid token address');
+                return;
+            }
+            
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'subscribe',
+                    tokenAddress: address
+                }));
+                
+                currentToken = address;
+                log(`📊 Subscribing to token: ${address}`);
+            } else {
+                log('❌ WebSocket not connected');
+            }
+        }
+        
+        // Get token analytics
+        async function getTokenAnalytics() {
+            const address = document.getElementById('tokenAddress').value.trim();
+            
+            if (!address || !address.startsWith('0x')) {
+                alert('Please enter a valid token address');
+                return;
+            }
+            
+            try {
+                log(`📈 Fetching analytics for ${address}...`);
+                
+                const response = await fetch(`http://localhost:3000/token/${address}/analytics`);
+                const data = await response.json();
+                
+                updateTokenInfo(data.token);
+                updateTradingSummary(data.summary);
+                updateTransfers(data.recentActivity);
+                
+                log(`✅ Analytics loaded for ${data.token.symbol}`);
+                
+            } catch (error) {
+                log(`❌ Failed to fetch analytics: ${error.message}`);
+            }
+        }
+        
+        // Update token info display
+        function updateTokenInfo(token) {
+            document.getElementById('tokenName').textContent = token.name || 'Unknown';
+            document.getElementById('tokenSymbol').textContent = token.symbol || 'N/A';
+            document.getElementById('tokenDecimals').textContent = token.decimals || '0';
+            
+            const supply = token.totalSupply ? 
+                (token.totalSupply / Math.pow(10, token.decimals || 0)).toLocaleString() : 
+                'Unknown';
+            document.getElementById('tokenSupply').textContent = supply;
+        }
+        
+        // Update trading summary
+        function updateTradingSummary(summary) {
+            document.getElementById('transfers24h').textContent = summary.transfers24h || '0';
+            document.getElementById('volume24h').textContent = summary.volume24h ? 
+                summary.volume24h.toLocaleString(undefined, {maximumFractionDigits: 2}) : '0';
+            document.getElementById('whaleMovements').textContent = summary.whaleMovements || '0';
+            document.getElementById('uniqueHolders').textContent = summary.uniqueHolders24h || '0';
+        }
+        
+        // Update transfers list
+        function updateTransfers(transfers) {
+            const container = document.getElementById('transfersList');
+            
+            if (!transfers || transfers.length === 0) {
+                container.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">No recent transfers</div>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            
+            transfers.slice(-20).reverse().forEach(transfer => {
+                const item = document.createElement('div');
+                item.className = 'transfer-item new';
+                
+                const timestamp = new Date(transfer.timestamp * 1000).toLocaleTimeString();
+                
+                item.innerHTML = `
+                    <div>
+                        <div class="transfer-amount">${transfer.readableAmount.toLocaleString(undefined, {maximumFractionDigits: 4})}</div>
+                        <div class="address">From: ${transfer.from.slice(0, 10)}...${transfer.from.slice(-8)}</div>
+                        <div class="address">To: ${transfer.to.slice(0, 10)}...${transfer.to.slice(-8)}</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div class="transfer-type ${transfer.type}">${transfer.type.replace('_', ' ')}</div>
+                        <div style="font-size: 12px; color: #666; margin-top: 5px;">${timestamp}</div>
+                    </div>
+                `;
+                
+                container.appendChild(item);
+            });
+        }
+        
+        // Log function
+        function log(message) {
+            const logs = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            logs.innerHTML += `[${timestamp}] ${message}\n`;
+            logs.scrollTop = logs.scrollHeight;
+        }
+    </script>
+</body>
+</html>

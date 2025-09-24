@@ -1,0 +1,35 @@
+{
+  "name": "0g-token-analytics-service",
+  "version": "1.0.0",
+  "description": "Real-time token analytics service powered by 0G Chain",
+  "main": "token-analytics-service.js",
+  "scripts": {
+    "start": "node token-analytics-service.js",
+    "dev": "nodemon token-analytics-service.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "0g",
+    "blockchain",
+    "token",
+    "analytics",
+    "real-time",
+    "websocket",
+    "defi"
+  ],
+  "author": "0G Chain Developer",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/frennadev/0G-NODE-RPC.git"
+  }
+}
