@@ -205,11 +205,17 @@
                 
                 const timestamp = new Date(trade.timestamp * 1000).toLocaleTimeString();
                 
+                const ethSpent = trade.ethValueFormatted || 0;
+                const gasFee = trade.gasFee || 0;
+                const totalCost = trade.totalCost || 0;
+                const pricePerToken = trade.pricePerToken || 0;
+                
                 tradeElement.innerHTML = `
                     <strong>${trade.type.toUpperCase()}</strong> - ${trade.amountFormatted.toLocaleString()} ${trade.tokenSymbol}
-                    <br><strong>Classification:</strong> ${trade.classification}
-                    <br><strong>Block:</strong> ${trade.blockNumber} | <strong>Time:</strong> ${timestamp}
-                    <br><strong>TX:</strong> ${trade.transactionHash.slice(0, 20)}...
+                    <br><strong>0G Spent:</strong> ${ethSpent.toFixed(6)} 0G | <strong>Gas Fee:</strong> ${gasFee.toFixed(6)} 0G
+                    <br><strong>Total Cost:</strong> ${totalCost.toFixed(6)} 0G | <strong>Price:</strong> ${pricePerToken.toFixed(8)} 0G per ${trade.tokenSymbol}
+                    <br><strong>Classification:</strong> ${trade.classification} | <strong>Block:</strong> ${trade.blockNumber}
+                    <br><strong>Time:</strong> ${timestamp} | <strong>TX:</strong> ${trade.transactionHash.slice(0, 20)}...
                     <br><strong>From:</strong> ${trade.from.slice(0, 10)}... → <strong>To:</strong> ${trade.to.slice(0, 10)}...
                 `;
                 

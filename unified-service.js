@@ -145,16 +145,33 @@ class UnifiedOGService {
                 const to = '0x' + log.topics[2].slice(26);
                 const amount = parseInt(log.data, 16);
                 
-                // Get block timestamp
+                // Get full transaction details for 0G amounts
+                const txDetails = await this.rpcCall('eth_getTransactionByHash', [log.transactionHash]);
+                const txReceipt = await this.rpcCall('eth_getTransactionReceipt', [log.transactionHash]);
                 const block = await this.rpcCall('eth_getBlockByHash', [log.blockHash, false]);
                 const timestamp = parseInt(block.timestamp, 16);
                 
-                // Simple trade classification
+                // Extract 0G/ETH amounts
+                const ethValue = parseInt(txDetails.value, 16);
+                const ethValueFormatted = ethValue / Math.pow(10, 18);
+                const gasUsed = parseInt(txReceipt.gasUsed, 16);
+                const gasPrice = parseInt(txDetails.gasPrice, 16);
+                const gasFee = (gasUsed * gasPrice) / Math.pow(10, 18);
+                const totalCost = ethValueFormatted + gasFee;
+                
+                // Calculate price per token
+                let pricePerToken = 0;
+                if (ethValueFormatted > 0 && amount > 0) {
+                    pricePerToken = ethValueFormatted / (amount / Math.pow(10, tokenInfo.decimals));
+                }
+                
+                // Trade classification with 0G consideration
                 let type = 'transfer';
                 if (from === this.knownPatterns.zeroAddress) type = 'mint';
                 else if (to === this.knownPatterns.zeroAddress) type = 'burn';
                 else if (this.knownPatterns.highVolumeAddresses.has(from)) type = 'sell';
                 else if (this.knownPatterns.highVolumeAddresses.has(to)) type = 'buy';
+                else if (ethValueFormatted > 0) type = 'buy'; // If 0G was spent, likely a buy
                 
                 const classification = this.classifyTradeSize(amount, tokenInfo.totalSupply);
                 
@@ -164,8 +181,19 @@ class UnifiedOGService {
                     timestamp: timestamp,
                     from: from.toLowerCase(),
                     to: to.toLowerCase(),
+                    
+                    // Token amounts
                     amount: amount,
                     amountFormatted: amount / Math.pow(10, tokenInfo.decimals),
+                    
+                    // 0G/ETH amounts
+                    ethValue: ethValue,
+                    ethValueFormatted: ethValueFormatted,
+                    gasFee: gasFee,
+                    totalCost: totalCost,
+                    pricePerToken: pricePerToken,
+                    
+                    // Classification
                     type: type,
                     classification: classification,
                     tokenSymbol: tokenInfo.symbol
@@ -330,16 +358,34 @@ class UnifiedOGService {
         }
     }
     
-    // Process individual transfer log
+    // Process individual transfer log with 0G/ETH amounts
     async processTransferLog(log, tokenInfo) {
         try {
             const from = '0x' + log.topics[1].slice(26);
             const to = '0x' + log.topics[2].slice(26);
             const amount = parseInt(log.data, 16);
             
+            // Get full transaction details to extract 0G/ETH amounts
+            const txDetails = await this.rpcCall('eth_getTransactionByHash', [log.transactionHash]);
+            const txReceipt = await this.rpcCall('eth_getTransactionReceipt', [log.transactionHash]);
+            
             // Get block timestamp
             const block = await this.rpcCall('eth_getBlockByHash', [log.blockHash, false]);
             const timestamp = parseInt(block.timestamp, 16);
+            
+            // Extract 0G/ETH value from transaction
+            const ethValue = parseInt(txDetails.value, 16);
+            const ethValueFormatted = ethValue / Math.pow(10, 18); // Convert wei to ETH/0G
+            const gasUsed = parseInt(txReceipt.gasUsed, 16);
+            const gasPrice = parseInt(txDetails.gasPrice, 16);
+            const gasFee = (gasUsed * gasPrice) / Math.pow(10, 18);
+            
+            // Calculate price per token (if ETH was spent)
+            let pricePerToken = 0;
+            let totalCost = ethValueFormatted + gasFee;
+            if (ethValueFormatted > 0 && amount > 0) {
+                pricePerToken = ethValueFormatted / (amount / Math.pow(10, tokenInfo.decimals));
+            }
             
             // Classify trade type
             let type = 'transfer';
@@ -347,6 +393,7 @@ class UnifiedOGService {
             else if (to === this.knownPatterns.zeroAddress) type = 'burn';
             else if (this.knownPatterns.highVolumeAddresses.has(from)) type = 'sell';
             else if (this.knownPatterns.highVolumeAddresses.has(to)) type = 'buy';
+            else if (ethValueFormatted > 0) type = 'buy'; // If ETH was spent, likely a buy
             
             const classification = this.classifyTradeSize(amount, tokenInfo.totalSupply);
             
@@ -356,8 +403,19 @@ class UnifiedOGService {
                 timestamp: timestamp,
                 from: from.toLowerCase(),
                 to: to.toLowerCase(),
+                
+                // Token amounts
                 amount: amount,
                 amountFormatted: amount / Math.pow(10, tokenInfo.decimals),
+                
+                // 0G/ETH amounts (NEW!)
+                ethValue: ethValue,
+                ethValueFormatted: ethValueFormatted,
+                gasFee: gasFee,
+                totalCost: totalCost,
+                pricePerToken: pricePerToken,
+                
+                // Trade classification
                 type: type,
                 classification: classification,
                 tokenSymbol: tokenInfo.symbol,
