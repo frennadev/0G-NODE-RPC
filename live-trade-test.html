@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>0G Live Trade Stream Test</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #00ff41;
+        }
+        .status {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 4px solid #00ff41;
+        }
+        .controls {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .controls input {
+            background: #1a1a1a;
+            color: #00ff00;
+            border: 1px solid #00ff41;
+            padding: 8px;
+            width: 400px;
+            font-family: 'Courier New', monospace;
+        }
+        .controls button {
+            background: #00ff41;
+            color: #1a1a1a;
+            border: none;
+            padding: 8px 15px;
+            margin-left: 10px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .controls button:hover {
+            background: #00cc33;
+        }
+        .trades {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 5px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .trade {
+            background: #1a1a1a;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 3px;
+            border-left: 4px solid #00ff41;
+        }
+        .trade.buy {
+            border-left-color: #00ff00;
+        }
+        .trade.sell {
+            border-left-color: #ff4444;
+        }
+        .trade.whale {
+            border-left-color: #ffaa00;
+            background: #2a1a00;
+        }
+        .logs {
+            background: #0a0a0a;
+            padding: 15px;
+            border-radius: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 0G Live Trade Stream Test</h1>
+            <p>Real-time Buy/Sell Detection via WebSocket</p>
+        </div>
+        
+        <div class="status">
+            <strong>Connection Status:</strong> <span id="status">Disconnected</span><br>
+            <strong>Live Trades Received:</strong> <span id="tradeCount">0</span><br>
+            <strong>Subscribed Token:</strong> <span id="subscribedToken">None</span>
+        </div>
+        
+        <div class="controls">
+            <strong>Subscribe to Token:</strong><br>
+            <input type="text" id="tokenAddress" placeholder="Enter token address (0x...)" 
+                   value="0x59ef6F3943bBdFE2fB19565037Ac85071223E94C">
+            <button onclick="subscribeToToken()">Subscribe</button>
+            <button onclick="disconnect()">Disconnect</button>
+        </div>
+        
+        <div class="trades">
+            <h3>📊 Live Trades Stream</h3>
+            <div id="tradesContainer">
+                <p>Click "Subscribe" to start receiving live trades...</p>
+            </div>
+        </div>
+        
+        <div class="logs">
+            <h3>📝 Connection Logs</h3>
+            <div id="logs"></div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let tradeCount = 0;
+        
+        function log(message) {
+            const logs = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            logs.innerHTML += `[${timestamp}] ${message}\n`;
+            logs.scrollTop = logs.scrollHeight;
+        }
+        
+        function connectWebSocket() {
+            try {
+                // Try to connect to the public WebSocket endpoint
+                ws = new WebSocket('wss://zerog-node-rpc.onrender.com/ws');
+                
+                ws.onopen = function() {
+                    document.getElementById('status').textContent = 'Connected';
+                    document.getElementById('status').style.color = '#00ff00';
+                    log('✅ Connected to 0G Live Trade Stream');
+                };
+                
+                ws.onclose = function() {
+                    document.getElementById('status').textContent = 'Disconnected';
+                    document.getElementById('status').style.color = '#ff4444';
+                    log('❌ Disconnected from trade stream');
+                };
+                
+                ws.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    handleMessage(data);
+                };
+                
+                ws.onerror = function(error) {
+                    log(`❌ WebSocket error: ${error}`);
+                };
+                
+            } catch (error) {
+                log(`❌ Connection failed: ${error.message}`);
+            }
+        }
+        
+        function handleMessage(data) {
+            log(`📨 Received: ${data.type}`);
+            
+            switch (data.type) {
+                case 'connected':
+                    log(`🎉 ${data.message}`);
+                    break;
+                    
+                case 'subscribed':
+                    log(`📺 ${data.message}`);
+                    document.getElementById('subscribedToken').textContent = data.tokenAddress;
+                    break;
+                    
+                case 'live_trades':
+                    log(`💰 ${data.trades.length} live trades received for block ${data.blockNumber}`);
+                    displayLiveTrades(data.trades);
+                    break;
+                    
+                case 'error':
+                    log(`❌ Error: ${data.message}`);
+                    break;
+            }
+        }
+        
+        function displayLiveTrades(trades) {
+            const container = document.getElementById('tradesContainer');
+            
+            if (tradeCount === 0) {
+                container.innerHTML = '';
+            }
+            
+            trades.forEach(trade => {
+                tradeCount++;
+                document.getElementById('tradeCount').textContent = tradeCount;
+                
+                const tradeElement = document.createElement('div');
+                tradeElement.className = `trade ${trade.type} ${trade.classification}`;
+                
+                const timestamp = new Date(trade.timestamp * 1000).toLocaleTimeString();
+                
+                tradeElement.innerHTML = `
+                    <strong>${trade.type.toUpperCase()}</strong> - ${trade.amountFormatted.toLocaleString()} ${trade.tokenSymbol}
+                    <br><strong>Classification:</strong> ${trade.classification}
+                    <br><strong>Block:</strong> ${trade.blockNumber} | <strong>Time:</strong> ${timestamp}
+                    <br><strong>TX:</strong> ${trade.transactionHash.slice(0, 20)}...
+                    <br><strong>From:</strong> ${trade.from.slice(0, 10)}... → <strong>To:</strong> ${trade.to.slice(0, 10)}...
+                `;
+                
+                container.insertBefore(tradeElement, container.firstChild);
+                
+                // Keep only last 20 trades
+                while (container.children.length > 20) {
+                    container.removeChild(container.lastChild);
+                }
+            });
+        }
+        
+        function subscribeToToken() {
+            const tokenAddress = document.getElementById('tokenAddress').value.trim();
+            
+            if (!tokenAddress || !tokenAddress.startsWith('0x')) {
+                alert('Please enter a valid token address');
+                return;
+            }
+            
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                connectWebSocket();
+                // Wait for connection then subscribe
+                setTimeout(() => {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        doSubscribe(tokenAddress);
+                    }
+                }, 1000);
+            } else {
+                doSubscribe(tokenAddress);
+            }
+        }
+        
+        function doSubscribe(tokenAddress) {
+            ws.send(JSON.stringify({
+                type: 'subscribe_live_trades',
+                tokenAddress: tokenAddress
+            }));
+            
+            log(`📊 Subscribing to live trades for ${tokenAddress}`);
+        }
+        
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            tradeCount = 0;
+            document.getElementById('tradeCount').textContent = '0';
+            document.getElementById('subscribedToken').textContent = 'None';
+            document.getElementById('tradesContainer').innerHTML = '<p>Click "Subscribe" to start receiving live trades...</p>';
+        }
+        
+        // Auto-connect on page load
+        window.onload = function() {
+            log('🚀 0G Live Trade Stream Test loaded');
+            log('📡 Ready to connect to WebSocket stream');
+        };
+    </script>
+</body>
+</html>

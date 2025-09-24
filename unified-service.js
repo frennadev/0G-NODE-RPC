@@ -40,6 +40,9 @@ class UnifiedOGService {
         this.wss = new WebSocket.Server({ port: this.wsPort });
         this.setupWebSocketServer();
         
+        // Start real-time monitoring
+        this.startRealTimeMonitoring();
+        
         console.log(`🚀 Unified 0G Service starting...`);
         console.log(`📊 HTTP Server: http://localhost:${this.port}`);
         console.log(`🔴 WebSocket: ws://localhost:${this.wsPort}`);
@@ -244,9 +247,186 @@ class UnifiedOGService {
         });
     }
 
+    // Start real-time monitoring
+    startRealTimeMonitoring() {
+        let lastProcessedBlock = null;
+        
+        const monitorNewBlocks = async () => {
+            try {
+                const latestBlock = await this.rpcCall('eth_blockNumber');
+                const currentBlockNumber = parseInt(latestBlock, 16);
+                
+                if (lastProcessedBlock === null) {
+                    lastProcessedBlock = currentBlockNumber;
+                    console.log(`🔍 Starting real-time monitoring from block ${currentBlockNumber}`);
+                    return;
+                }
+                
+                if (currentBlockNumber > lastProcessedBlock) {
+                    console.log(`🆕 New block detected: ${currentBlockNumber} (processing ${currentBlockNumber - lastProcessedBlock} new blocks)`);
+                    
+                    // Process new blocks
+                    for (let blockNum = lastProcessedBlock + 1; blockNum <= currentBlockNumber; blockNum++) {
+                        await this.processNewBlock(blockNum);
+                    }
+                    
+                    lastProcessedBlock = currentBlockNumber;
+                }
+            } catch (error) {
+                console.error('❌ Error monitoring new blocks:', error.message);
+            }
+        };
+        
+        // Monitor every 3 seconds
+        setInterval(monitorNewBlocks, 3000);
+        console.log('🔄 Real-time block monitoring started (3s interval)');
+    }
+    
+    // Process new block for trades
+    async processNewBlock(blockNumber) {
+        try {
+            // Get all transfer events from this block for tracked tokens
+            const trackedTokenAddresses = Array.from(this.trackedTokens.keys());
+            
+            if (trackedTokenAddresses.length === 0) return;
+            
+            for (const tokenAddress of trackedTokenAddresses) {
+                const blockHex = '0x' + blockNumber.toString(16);
+                
+                const logs = await this.rpcCall('eth_getLogs', [{
+                    fromBlock: blockHex,
+                    toBlock: blockHex,
+                    address: tokenAddress,
+                    topics: [this.eventSignatures.transfer]
+                }]);
+                
+                if (logs.length > 0) {
+                    console.log(`💰 Found ${logs.length} new transfers for ${tokenAddress} in block ${blockNumber}`);
+                    
+                    const tokenInfo = this.trackedTokens.get(tokenAddress);
+                    const newTrades = [];
+                    
+                    for (const log of logs) {
+                        const trade = await this.processTransferLog(log, tokenInfo);
+                        if (trade) {
+                            newTrades.push(trade);
+                        }
+                    }
+                    
+                    if (newTrades.length > 0) {
+                        // Broadcast to WebSocket subscribers
+                        this.broadcastToSubscribers(tokenAddress, {
+                            type: 'live_trades',
+                            tokenAddress: tokenAddress,
+                            blockNumber: blockNumber,
+                            trades: newTrades,
+                            timestamp: Date.now()
+                        });
+                    }
+                }
+            }
+        } catch (error) {
+            console.error(`❌ Error processing block ${blockNumber}:`, error.message);
+        }
+    }
+    
+    // Process individual transfer log
+    async processTransferLog(log, tokenInfo) {
+        try {
+            const from = '0x' + log.topics[1].slice(26);
+            const to = '0x' + log.topics[2].slice(26);
+            const amount = parseInt(log.data, 16);
+            
+            // Get block timestamp
+            const block = await this.rpcCall('eth_getBlockByHash', [log.blockHash, false]);
+            const timestamp = parseInt(block.timestamp, 16);
+            
+            // Classify trade type
+            let type = 'transfer';
+            if (from === this.knownPatterns.zeroAddress) type = 'mint';
+            else if (to === this.knownPatterns.zeroAddress) type = 'burn';
+            else if (this.knownPatterns.highVolumeAddresses.has(from)) type = 'sell';
+            else if (this.knownPatterns.highVolumeAddresses.has(to)) type = 'buy';
+            
+            const classification = this.classifyTradeSize(amount, tokenInfo.totalSupply);
+            
+            return {
+                transactionHash: log.transactionHash,
+                blockNumber: parseInt(log.blockNumber, 16),
+                timestamp: timestamp,
+                from: from.toLowerCase(),
+                to: to.toLowerCase(),
+                amount: amount,
+                amountFormatted: amount / Math.pow(10, tokenInfo.decimals),
+                type: type,
+                classification: classification,
+                tokenSymbol: tokenInfo.symbol,
+                tokenAddress: tokenInfo.address,
+                logIndex: parseInt(log.logIndex, 16),
+                isLive: true // Mark as live trade
+            };
+        } catch (error) {
+            console.error('❌ Error processing transfer log:', error.message);
+            return null;
+        }
+    }
+    
+    // Broadcast to WebSocket subscribers
+    broadcastToSubscribers(tokenAddress, message) {
+        let subscriberCount = 0;
+        
+        this.wss.clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN && 
+                client.subscribedTokens && 
+                client.subscribedTokens.has(tokenAddress)) {
+                client.send(JSON.stringify(message));
+                subscriberCount++;
+            }
+        });
+        
+        if (subscriberCount > 0) {
+            console.log(`📡 Broadcasted live trades to ${subscriberCount} subscribers for ${tokenAddress}`);
+        }
+    }
+    
+    // Subscribe to token for real-time updates
+    subscribeToToken(ws, tokenAddress) {
+        if (!this.trackedTokens.has(tokenAddress)) {
+            // Add token to tracking
+            this.trackedTokens.set(tokenAddress, {
+                address: tokenAddress,
+                subscribers: new Set()
+            });
+            console.log(`📊 Started tracking ${tokenAddress} for real-time updates`);
+        }
+        
+        // Add client to subscribers
+        if (!ws.subscribedTokens) {
+            ws.subscribedTokens = new Set();
+        }
+        ws.subscribedTokens.add(tokenAddress);
+        
+        const tokenData = this.trackedTokens.get(tokenAddress);
+        tokenData.subscribers.add(ws.clientId);
+        
+        ws.send(JSON.stringify({
+            type: 'subscribed',
+            tokenAddress: tokenAddress,
+            message: `Subscribed to live trades for ${tokenAddress}`
+        }));
+        
+        console.log(`📺 Client ${ws.clientId} subscribed to live trades for ${tokenAddress}`);
+    }
+
     // Handle WebSocket messages
     async handleWebSocketMessage(ws, data) {
         switch (data.type) {
+            case 'subscribe_live_trades':
+                if (data.tokenAddress) {
+                    this.subscribeToToken(ws, data.tokenAddress);
+                }
+                break;
+                
             case 'get_token_trades':
                 if (data.tokenAddress) {
                     const trades = await this.getTokenTrades(data.tokenAddress, data.limit || 100);
@@ -260,7 +440,7 @@ class UnifiedOGService {
             default:
                 ws.send(JSON.stringify({
                     type: 'error',
-                    message: 'Unknown message type'
+                    message: 'Unknown message type. Available: subscribe_live_trades, get_token_trades'
                 }));
         }
     }
@@ -312,8 +492,20 @@ class UnifiedOGService {
             }
         });
         
+        // Handle WebSocket upgrade on main server
+        server.on('upgrade', (request, socket, head) => {
+            if (request.url === '/ws' || request.url === '/websocket') {
+                this.wss.handleUpgrade(request, socket, head, (ws) => {
+                    this.wss.emit('connection', ws, request);
+                });
+            } else {
+                socket.destroy();
+            }
+        });
+        
         server.listen(this.port, () => {
             console.log(`🌐 Unified 0G Service running on port ${this.port}`);
+            console.log(`🔴 WebSocket available at: ws://localhost:${this.port}/ws`);
         });
         
         return server;
@@ -418,7 +610,8 @@ class UnifiedOGService {
                     endpoints: {
                         mainnet_rpc: this.rpcUrl,
                         testnet_rpc: this.testnetRpcUrl,
-                        websocket: `ws://localhost:${this.wsPort}`
+                        websocket: `ws://localhost:${this.port}/ws`,
+                        websocket_internal: `ws://localhost:${this.wsPort}`
                     },
                     stats: {
                         total_requests: this.rpcStats.totalRequests,
