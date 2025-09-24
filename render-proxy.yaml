@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: og-rpc-proxy
+    env: docker
+    plan: starter # Much cheaper since no sync required!
+    region: oregon
+    dockerfilePath: ./Dockerfile.proxy
+    dockerContext: ./
+    envVars:
+      - key: OFFICIAL_RPC
+        value: https://evmrpc.0g.ai/
+      - key: TESTNET_RPC
+        value: https://evmrpc-testnet.0g.ai/
+      - key: PROXY_PORT
+        value: 26657
+    healthCheckPath: /health
+    numInstances: 1
+    scaling:
+      minInstances: 1
+      maxInstances: 3 # Can scale up for high traffic
+    resources:
+      cpu: 500m # Much lower requirements!
+      memory: 512Mi # Minimal memory needed
+
+# Benefits of this approach:
+# ✅ No sync required - instant startup
+# ✅ Much cheaper (starter plan vs pro plan)
+# ✅ Reliable (uses official 0G infrastructure)
+# ✅ Scalable (can handle multiple requests)
+# ✅ Both mainnet and testnet support
+# ✅ Full RPC compatibility

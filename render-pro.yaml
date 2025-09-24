@@ -1,0 +1,47 @@
+services:
+  - type: web
+    name: og-chain-node-enhanced
+    env: docker
+    plan: pro # Using your existing Pro plan
+    region: oregon
+    dockerfilePath: ./Dockerfile.enhanced
+    dockerContext: ./
+    envVars:
+      - key: OFFICIAL_RPC
+        value: https://evmrpc.0g.ai/
+      - key: TESTNET_RPC
+        value: https://evmrpc-testnet.0g.ai/
+      - key: PROXY_PORT
+        value: 26657
+      - key: MONITORING_PORT
+        value: 9615
+      - key: NODE_ENV
+        value: production
+      - key: PM2_INSTANCES
+        value: 4
+    healthCheckPath: /health
+    numInstances: 1
+    scaling:
+      minInstances: 1
+      maxInstances: 1
+    resources:
+      cpu: 4000m # Full Pro plan CPU
+      memory: 16Gi # Full Pro plan memory
+    
+    # Custom headers for your domain
+    headers:
+      - name: X-0G-Node-Type
+        value: Enhanced-RPC-Proxy
+      - name: X-0G-Network
+        value: Mainnet-Ready
+
+# Benefits with Pro Plan:
+# ✅ Instant startup (no sync wait)
+# ✅ 4 CPU cores for high performance
+# ✅ 16GB RAM for caching and connection pooling
+# ✅ Load balancing with PM2
+# ✅ Real-time monitoring and statistics
+# ✅ Enhanced error handling and logging
+# ✅ Connection pooling for optimal performance
+# ✅ Both mainnet and testnet support
+# ✅ Full compatibility with existing RPC commands

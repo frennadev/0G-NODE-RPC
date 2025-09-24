@@ -1,10 +1,32 @@
 # 0G Chain Geth RPC Commands - Complete Reference
 
-🚀 **Live RPC Endpoint**: https://zerog-node-rpc.onrender.com/
+## 🌐 **Official Network Endpoints**
 
-## ⚠️ **Current Status**
-- ✅ **Consensus Layer (Tendermint)**: Working on port 26657
-- ❌ **Execution Layer (Geth)**: Not responding to eth_* methods yet
+### **Mainnet (Primary Network)**
+- **Primary RPC**: https://evmrpc.0g.ai/
+- **Block Explorer**: https://chainscan.0g.ai
+
+### **Testnet**
+- **Testnet RPC**: https://evmrpc-testnet.0g.ai
+- **Block Explorer**: https://chainscan.0g.ai (supports both networks)
+
+### **Additional Services**
+- **Pyth Price Feed**: https://hermes.pyth.network
+
+### **Custom Node (Development)**
+- **Custom RPC**: https://zerog-node-rpc.onrender.com/
+
+---
+
+## ⚠️ **Network Selection Guide**
+- 🟢 **Use Mainnet** (`https://evmrpc.0g.ai/`) for production applications and real transactions
+- 🟡 **Use Testnet** (`https://evmrpc-testnet.0g.ai`) for development, testing, and experimentation
+- 🔧 **Use Custom Node** for local development or when running your own 0G node
+
+## 📊 **Current Status**
+- ✅ **Official Mainnet RPC**: Fully operational
+- ✅ **Official Testnet RPC**: Fully operational  
+- ❌ **Custom Node (Render)**: Execution layer not responding to eth_* methods
 
 ## 🔍 **Testing with Address: 0x8B598A7C136215A95ba0282b4d832B9f9801f2e2**
 

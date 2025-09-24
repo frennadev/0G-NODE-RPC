@@ -1,0 +1,27 @@
+# 0G Chain RPC Proxy - No Sync Required!
+FROM node:18-alpine
+
+# Install curl for health checks
+RUN apk add --no-cache curl
+
+# Create app directory
+WORKDIR /app
+
+# Copy proxy script
+COPY start-rpc-proxy.sh ./
+RUN chmod +x start-rpc-proxy.sh
+
+# Expose proxy port
+EXPOSE 26657
+
+# Set environment variables
+ENV OFFICIAL_RPC="https://evmrpc.0g.ai/"
+ENV TESTNET_RPC="https://evmrpc-testnet.0g.ai/"
+ENV PROXY_PORT="26657"
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:26657/health || exit 1
+
+# Start proxy
+CMD ["./start-rpc-proxy.sh"]

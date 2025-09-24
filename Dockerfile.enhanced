@@ -1,0 +1,45 @@
+# Enhanced 0G Chain RPC Proxy - Optimized for Pro Plan
+FROM node:18-alpine
+
+# Install additional tools for monitoring and debugging
+RUN apk add --no-cache \
+    curl \
+    jq \
+    htop \
+    net-tools \
+    tcpdump
+
+# Create app directory
+WORKDIR /app
+
+# Copy all proxy files
+COPY start-rpc-proxy.sh ./
+COPY rpc_proxy.py ./
+COPY enhanced-proxy-server.js ./
+
+RUN chmod +x start-rpc-proxy.sh rpc_proxy.py
+
+# Install PM2 for process management and monitoring
+RUN npm install -g pm2
+
+# Expose proxy port and monitoring port
+EXPOSE 26657 9615
+
+# Set environment variables optimized for Pro plan
+ENV OFFICIAL_RPC="https://evmrpc.0g.ai/"
+ENV TESTNET_RPC="https://evmrpc-testnet.0g.ai/"
+ENV PROXY_PORT="26657"
+ENV MONITORING_PORT="9615"
+ENV NODE_ENV="production"
+ENV PM2_INSTANCES="4"
+
+# Enhanced health check with more comprehensive testing
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:26657/health && \
+        curl -f -X POST http://localhost:26657 \
+        -H "Content-Type: application/json" \
+        -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' | \
+        jq -e '.result' > /dev/null || exit 1
+
+# Start enhanced proxy with PM2
+CMD ["pm2-runtime", "start", "enhanced-proxy-server.js", "--instances", "4", "--name", "0g-proxy"]
