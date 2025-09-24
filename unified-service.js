@@ -331,7 +331,15 @@ class UnifiedOGService {
                 if (logs.length > 0) {
                     console.log(`💰 Found ${logs.length} new transfers for ${tokenAddress} in block ${blockNumber}`);
                     
-                    const tokenInfo = this.trackedTokens.get(tokenAddress);
+                    // Get full token info for processing
+                    let tokenInfo = this.trackedTokens.get(tokenAddress);
+                    if (!tokenInfo.decimals) {
+                        // If we don't have full token info, fetch it
+                        const fullTokenInfo = await this.getTokenInfo(tokenAddress);
+                        tokenInfo = { ...tokenInfo, ...fullTokenInfo };
+                        this.trackedTokens.set(tokenAddress, tokenInfo);
+                    }
+                    
                     const newTrades = [];
                     
                     for (const log of logs) {
@@ -448,14 +456,24 @@ class UnifiedOGService {
     }
     
     // Subscribe to token for real-time updates
-    subscribeToToken(ws, tokenAddress) {
+    async subscribeToToken(ws, tokenAddress) {
         if (!this.trackedTokens.has(tokenAddress)) {
-            // Add token to tracking
-            this.trackedTokens.set(tokenAddress, {
-                address: tokenAddress,
-                subscribers: new Set()
-            });
-            console.log(`📊 Started tracking ${tokenAddress} for real-time updates`);
+            // Get full token info and add to tracking
+            try {
+                const tokenInfo = await this.getTokenInfo(tokenAddress);
+                this.trackedTokens.set(tokenAddress, {
+                    ...tokenInfo,
+                    subscribers: new Set()
+                });
+                console.log(`📊 Started tracking ${tokenInfo.symbol} (${tokenAddress}) for real-time updates`);
+            } catch (error) {
+                console.error(`❌ Failed to get token info for ${tokenAddress}:`, error.message);
+                // Fallback to basic tracking
+                this.trackedTokens.set(tokenAddress, {
+                    address: tokenAddress,
+                    subscribers: new Set()
+                });
+            }
         }
         
         // Add client to subscribers
@@ -481,7 +499,7 @@ class UnifiedOGService {
         switch (data.type) {
             case 'subscribe_live_trades':
                 if (data.tokenAddress) {
-                    this.subscribeToToken(ws, data.tokenAddress);
+                    await this.subscribeToToken(ws, data.tokenAddress);
                 }
                 break;
                 
