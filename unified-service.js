@@ -277,9 +277,9 @@ class UnifiedOGService {
             }
         };
         
-        // Monitor every 3 seconds
-        setInterval(monitorNewBlocks, 3000);
-        console.log('🔄 Real-time block monitoring started (3s interval)');
+        // Monitor every 1 second for ultra-fast detection
+        setInterval(monitorNewBlocks, 1000);
+        console.log('🔄 Real-time block monitoring started (1s interval)');
     }
     
     // Process new block for trades
