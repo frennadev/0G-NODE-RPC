@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>0G DEX Trade Stream - Real-time Buy/Sell Tracker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.8em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.3em;
+            opacity: 0.9;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-3px);
+        }
+        
+        .card h3 {
+            color: #1e3c72;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .status-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            border-left: 4px solid #1e3c72;
+        }
+        
+        .status-item .label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .status-item .value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #1e3c72;
+        }
+        
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .input-group input {
+            flex: 1;
+            min-width: 300px;
+            padding: 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+        
+        .input-group input:focus {
+            outline: none;
+            border-color: #1e3c72;
+            box-shadow: 0 0 0 3px rgba(30, 60, 114, 0.1);
+        }
+        
+        .btn {
+            padding: 15px 25px;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(30, 60, 114, 0.3);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn.secondary {
+            background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 8px 15px;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .trades-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .trades-list {
+            max-height: 500px;
+            overflow-y: auto;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            background: #f8f9fa;
+        }
+        
+        .trade-item {
+            padding: 15px;
+            border-bottom: 1px solid #e1e5e9;
+            transition: background-color 0.3s ease;
+        }
+        
+        .trade-item:last-child {
+            border-bottom: none;
+        }
+        
+        .trade-item.new {
+            background: linear-gradient(90deg, #d1ecf1 0%, #f8f9fa 100%);
+            animation: highlight 3s ease-out;
+        }
+        
+        .trade-item.buy {
+            border-left: 4px solid #28a745;
+        }
+        
+        .trade-item.sell {
+            border-left: 4px solid #dc3545;
+        }
+        
+        @keyframes highlight {
+            0% { background: linear-gradient(90deg, #b3e5fc 0%, #e3f2fd 100%); }
+            100% { background: linear-gradient(90deg, #d1ecf1 0%, #f8f9fa 100%); }
+        }
+        
+        .trade-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .trade-type {
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .trade-type.buy {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .trade-type.sell {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .trade-amount {
+            font-weight: bold;
+            font-size: 16px;
+            color: #1e3c72;
+        }
+        
+        .trade-details {
+            font-size: 12px;
+            color: #666;
+            line-height: 1.4;
+        }
+        
+        .trade-price {
+            font-weight: bold;
+            color: #2a5298;
+        }
+        
+        .trade-classification {
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .trade-classification.whale {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .trade-classification.large {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .trade-classification.medium {
+            background: #cce5ff;
+            color: #004085;
+        }
+        
+        .trade-classification.small {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        
+        .summary-item {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid #dee2e6;
+        }
+        
+        .summary-item .label {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .summary-item .value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1e3c72;
+        }
+        
+        .logs {
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 250px;
+            overflow-y: auto;
+            border: 2px solid #333;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #1e3c72;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @media (max-width: 768px) {
+            .trades-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .input-group {
+                flex-direction: column;
+            }
+            
+            .input-group input {
+                min-width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💰 0G DEX Trade Stream</h1>
+            <p>Real-time Buy/Sell Detection & Complete Trade History</p>
+        </div>
+        
+        <div class="card">
+            <h3>🔗 Connection Status</h3>
+            <div class="status-grid">
+                <div class="status-item">
+                    <div class="label">WebSocket</div>
+                    <div class="value" id="wsStatus">Disconnected</div>
+                </div>
+                <div class="status-item">
+                    <div class="label">API Status</div>
+                    <div class="value" id="apiStatus">Checking...</div>
+                </div>
+                <div class="status-item">
+                    <div class="label">Tracked Tokens</div>
+                    <div class="value" id="trackedTokens">0</div>
+                </div>
+                <div class="status-item">
+                    <div class="label">Active Streams</div>
+                    <div class="value" id="activeStreams">0</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3>📊 Token Trade Tracker</h3>
+            <div class="input-group">
+                <input type="text" id="tokenAddress" placeholder="Enter token contract address (0x...)" 
+                       value="0x59ef6F3943bBdFE2fB19565037Ac85071223E94C">
+                <button class="btn" onclick="subscribeToTrades()">🔴 Stream Trades</button>
+                <button class="btn secondary" onclick="getAllTrades()">📈 Get All Trades</button>
+                <button class="btn secondary" onclick="getTradeSummary()">📊 Summary</button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3>📈 Trading Summary</h3>
+            <div id="tradingSummary" class="summary-grid">
+                <div class="summary-item">
+                    <div class="label">Total Trades</div>
+                    <div class="value" id="totalTrades">-</div>
+                </div>
+                <div class="summary-item">
+                    <div class="label">Total Buys</div>
+                    <div class="value" id="totalBuys">-</div>
+                </div>
+                <div class="summary-item">
+                    <div class="label">Total Sells</div>
+                    <div class="value" id="totalSells">-</div>
+                </div>
+                <div class="summary-item">
+                    <div class="label">24h Volume</div>
+                    <div class="value" id="volume24h">-</div>
+                </div>
+                <div class="summary-item">
+                    <div class="label">Buy Pressure</div>
+                    <div class="value" id="buyPressure">-</div>
+                </div>
+                <div class="summary-item">
+                    <div class="label">Whale Trades</div>
+                    <div class="value" id="whaleTrades">-</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="trades-container">
+            <div class="card">
+                <h3>🔄 Live Trade Stream</h3>
+                <div id="liveTradesList" class="trades-list">
+                    <div class="loading">
+                        <div>Subscribe to a token to see live trades</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>📋 All Trades History</h3>
+                <div id="allTradesList" class="trades-list">
+                    <div class="loading">
+                        <div>Click "Get All Trades" to load complete history</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3>📝 Activity Logs</h3>
+            <div id="logs" class="logs"></div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let currentToken = null;
+        let liveTradesCount = 0;
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAPIStatus();
+            connectWebSocket();
+        });
+        
+        // Check API status
+        async function checkAPIStatus() {
+            try {
+                const response = await fetch('http://localhost:4000/health');
+                const data = await response.json();
+                
+                document.getElementById('apiStatus').textContent = 'Connected';
+                document.getElementById('trackedTokens').textContent = data.trackedTokens;
+                document.getElementById('activeStreams').textContent = data.activeConnections;
+                
+                log(`✅ DEX Trade API Connected - ${data.trackedTokens} tokens tracked`);
+            } catch (error) {
+                document.getElementById('apiStatus').textContent = 'Disconnected';
+                log(`❌ API Connection failed: ${error.message}`);
+            }
+        }
+        
+        // Connect to WebSocket
+        function connectWebSocket() {
+            try {
+                ws = new WebSocket('ws://localhost:4001');
+                
+                ws.onopen = function() {
+                    document.getElementById('wsStatus').textContent = 'Connected';
+                    log('🔗 Trade stream WebSocket connected');
+                };
+                
+                ws.onclose = function() {
+                    document.getElementById('wsStatus').textContent = 'Disconnected';
+                    log('🔌 Trade stream WebSocket disconnected');
+                    
+                    // Reconnect after 3 seconds
+                    setTimeout(connectWebSocket, 3000);
+                };
+                
+                ws.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    handleWebSocketMessage(data);
+                };
+                
+                ws.onerror = function(error) {
+                    log(`❌ WebSocket error: ${error}`);
+                };
+                
+            } catch (error) {
+                log(`❌ WebSocket connection failed: ${error.message}`);
+            }
+        }
+        
+        // Handle WebSocket messages
+        function handleWebSocketMessage(data) {
+            switch (data.type) {
+                case 'connected':
+                    log(`🎉 Connected to trade stream: ${data.clientId}`);
+                    break;
+                    
+                case 'subscribed_trades':
+                    log(`📺 Subscribed to ${data.tokenInfo.symbol} trade stream`);
+                    currentToken = data.tokenInfo;
+                    break;
+                    
+                case 'new_trades':
+                    log(`💰 ${data.trades.length} new trades detected for ${data.token.symbol}`);
+                    displayLiveTrades(data.trades);
+                    break;
+                    
+                case 'all_trades':
+                    log(`📊 Loaded ${data.data.trades.length} total trades`);
+                    displayAllTrades(data.data.trades);
+                    updateTradingSummary(data.data.summary);
+                    break;
+                    
+                case 'error':
+                    log(`❌ Error: ${data.message}`);
+                    break;
+            }
+        }
+        
+        // Subscribe to trade stream
+        function subscribeToTrades() {
+            const address = document.getElementById('tokenAddress').value.trim();
+            
+            if (!address || !address.startsWith('0x')) {
+                alert('Please enter a valid token address');
+                return;
+            }
+            
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'subscribe_trades',
+                    tokenAddress: address
+                }));
+                
+                currentToken = address;
+                liveTradesCount = 0;
+                document.getElementById('liveTradesList').innerHTML = '<div class="loading"><div class="spinner"></div><div>Connecting to trade stream...</div></div>';
+                log(`📊 Subscribing to trade stream: ${address}`);
+            } else {
+                log('❌ WebSocket not connected');
+            }
+        }
+        
+        // Get all trades
+        async function getAllTrades() {
+            const address = document.getElementById('tokenAddress').value.trim();
+            
+            if (!address || !address.startsWith('0x')) {
+                alert('Please enter a valid token address');
+                return;
+            }
+            
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                document.getElementById('allTradesList').innerHTML = '<div class="loading"><div class="spinner"></div><div>Loading complete trade history...</div></div>';
+                
+                ws.send(JSON.stringify({
+                    type: 'get_all_trades',
+                    tokenAddress: address,
+                    fromBlock: '0x0',
+                    limit: 1000
+                }));
+                
+                log(`📈 Fetching all trades for ${address}...`);
+            } else {
+                log('❌ WebSocket not connected');
+            }
+        }
+        
+        // Get trade summary
+        async function getTradeSummary() {
+            const address = document.getElementById('tokenAddress').value.trim();
+            
+            if (!address || !address.startsWith('0x')) {
+                alert('Please enter a valid token address');
+                return;
+            }
+            
+            try {
+                log(`📊 Fetching trade summary for ${address}...`);
+                
+                const response = await fetch(`http://localhost:4000/trades/${address}/summary`);
+                const data = await response.json();
+                
+                updateTradingSummary(data.summary);
+                displayAllTrades(data.lastTrades);
+                
+                log(`✅ Trade summary loaded for ${data.token.symbol}`);
+                
+            } catch (error) {
+                log(`❌ Failed to fetch trade summary: ${error.message}`);
+            }
+        }
+        
+        // Display live trades
+        function displayLiveTrades(trades) {
+            const container = document.getElementById('liveTradesList');
+            
+            if (liveTradesCount === 0) {
+                container.innerHTML = '';
+            }
+            
+            trades.forEach(trade => {
+                const item = createTradeElement(trade, true);
+                container.insertBefore(item, container.firstChild);
+                liveTradesCount++;
+            });
+            
+            // Keep only last 50 live trades
+            while (container.children.length > 50) {
+                container.removeChild(container.lastChild);
+            }
+        }
+        
+        // Display all trades
+        function displayAllTrades(trades) {
+            const container = document.getElementById('allTradesList');
+            
+            if (!trades || trades.length === 0) {
+                container.innerHTML = '<div class="loading"><div>No trades found</div></div>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            
+            // Show most recent trades first
+            trades.slice(-100).reverse().forEach(trade => {
+                const item = createTradeElement(trade, false);
+                container.appendChild(item);
+            });
+        }
+        
+        // Create trade element
+        function createTradeElement(trade, isLive) {
+            const item = document.createElement('div');
+            item.className = `trade-item ${trade.type}${isLive ? ' new' : ''}`;
+            
+            const timestamp = new Date(trade.timestamp * 1000);
+            const timeString = timestamp.toLocaleString();
+            
+            const tokenAmount = trade.tokenAmountFormatted || (trade.tokenAmount / Math.pow(10, 9));
+            
+            item.innerHTML = `
+                <div class="trade-header">
+                    <div class="trade-type ${trade.type}">${trade.type}</div>
+                    <div class="trade-classification ${trade.classification}">${trade.classification}</div>
+                </div>
+                <div class="trade-amount">${tokenAmount.toLocaleString(undefined, {maximumFractionDigits: 4})} ${trade.tokenSymbol || 'PAI'}</div>
+                <div class="trade-details">
+                    <div>Block: ${trade.blockNumber.toLocaleString()}</div>
+                    <div>Time: ${timeString}</div>
+                    <div>Gas: ${trade.gasUsed ? trade.gasUsed.toLocaleString() : 'N/A'}</div>
+                    ${trade.price ? `<div class="trade-price">Price: ${trade.price.toFixed(8)} ETH</div>` : ''}
+                </div>
+                <div class="trade-details" style="margin-top: 8px; font-size: 11px;">
+                    <div>TX: ${trade.transactionHash.slice(0, 20)}...${trade.transactionHash.slice(-10)}</div>
+                    ${trade.pairAddress ? `<div>Pair: ${trade.pairAddress.slice(0, 10)}...${trade.pairAddress.slice(-8)}</div>` : ''}
+                </div>
+            `;
+            
+            return item;
+        }
+        
+        // Update trading summary
+        function updateTradingSummary(summary) {
+            if (!summary) return;
+            
+            document.getElementById('totalTrades').textContent = summary.totalTrades?.toLocaleString() || '0';
+            document.getElementById('totalBuys').textContent = summary.totalBuys?.toLocaleString() || '0';
+            document.getElementById('totalSells').textContent = summary.totalSells?.toLocaleString() || '0';
+            document.getElementById('volume24h').textContent = summary.volume24h ? 
+                summary.volume24h.toLocaleString(undefined, {maximumFractionDigits: 2}) : '0';
+            document.getElementById('buyPressure').textContent = summary.buyPressure ? 
+                summary.buyPressure.toFixed(1) + '%' : '0%';
+            document.getElementById('whaleTrades').textContent = summary.whaleTradesCount?.toLocaleString() || '0';
+        }
+        
+        // Log function
+        function log(message) {
+            const logs = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            logs.innerHTML += `[${timestamp}] ${message}\n`;
+            logs.scrollTop = logs.scrollHeight;
+            
+            // Keep only last 100 log entries
+            const lines = logs.innerHTML.split('\n');
+            if (lines.length > 100) {
+                logs.innerHTML = lines.slice(-100).join('\n');
+            }
+        }
+        
+        // Auto-refresh API status
+        setInterval(checkAPIStatus, 30000); // Every 30 seconds
+    </script>
+</body>
+</html>
