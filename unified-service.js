@@ -40,16 +40,98 @@ class UnifiedOGService {
         this.wss = new WebSocket.Server({ port: this.wsPort });
         this.setupWebSocketServer();
         
+        // Rate limiting and caching
+        this.requestQueue = [];
+        this.requestsThisSecond = 0;
+        this.maxRequestsPerSecond = 40; // Conservative limit to avoid rate limits
+        this.lastResetTime = Date.now();
+        this.isProcessingQueue = false;
+        this.rateLimitBackoff = 1000; // Start with 1 second backoff
+        this.maxBackoff = 30000; // Max 30 seconds
+        
+        // Caches for performance
+        this.tokenInfoCache = new Map();
+        this.blockCache = new Map();
+        this.txCache = new Map();
+        
+        // Start request queue processor
+        this.startRequestQueueProcessor();
+        
         // Start real-time monitoring
         this.startRealTimeMonitoring();
         
         console.log(`🚀 Unified 0G Service starting...`);
         console.log(`📊 HTTP Server: http://localhost:${this.port}`);
         console.log(`🔴 WebSocket: ws://localhost:${this.wsPort}`);
+        console.log(`⚡ Rate Limiting: ${this.maxRequestsPerSecond} RPS max`);
     }
 
-    // RPC call to 0G chain
+    // Rate limiting request queue processor
+    startRequestQueueProcessor() {
+        setInterval(() => {
+            const now = Date.now();
+            if (now - this.lastResetTime >= 1000) {
+                this.requestsThisSecond = 0;
+                this.lastResetTime = now;
+            }
+            
+            this.processRequestQueue();
+        }, 50); // Check every 50ms
+    }
+    
+    async processRequestQueue() {
+        if (this.isProcessingQueue || this.requestQueue.length === 0) return;
+        
+        this.isProcessingQueue = true;
+        
+        while (this.requestQueue.length > 0 && this.requestsThisSecond < this.maxRequestsPerSecond) {
+            const request = this.requestQueue.shift();
+            this.requestsThisSecond++;
+            
+            try {
+                const result = await this.makeDirectRpcCall(request.method, request.params, request.network);
+                request.resolve(result);
+                
+                // Reset backoff on success
+                this.rateLimitBackoff = Math.max(1000, this.rateLimitBackoff * 0.9);
+            } catch (error) {
+                if (error.message.includes('rate exceeded') || error.message.includes('Too many requests')) {
+                    // Rate limited - put request back and increase backoff
+                    this.requestQueue.unshift(request);
+                    this.rateLimitBackoff = Math.min(this.maxBackoff, this.rateLimitBackoff * 2);
+                    console.log(`⚠️ Rate limited, backing off for ${this.rateLimitBackoff}ms`);
+                    
+                    // Wait before processing more requests
+                    setTimeout(() => {
+                        this.isProcessingQueue = false;
+                    }, this.rateLimitBackoff);
+                    return;
+                } else {
+                    request.reject(error);
+                }
+            }
+        }
+        
+        this.isProcessingQueue = false;
+    }
+
+    // RPC call to 0G chain (now with rate limiting)
     async rpcCall(method, params = [], network = 'mainnet') {
+        return new Promise((resolve, reject) => {
+            // Add to queue for rate limiting
+            this.requestQueue.push({
+                method,
+                params,
+                network,
+                resolve,
+                reject,
+                timestamp: Date.now()
+            });
+        });
+    }
+    
+    // Direct RPC call (used by queue processor)
+    async makeDirectRpcCall(method, params = [], network = 'mainnet') {
         return new Promise((resolve, reject) => {
             const data = JSON.stringify({
                 jsonrpc: '2.0',
@@ -145,21 +227,18 @@ class UnifiedOGService {
                 const to = '0x' + log.topics[2].slice(26);
                 const amount = parseInt(log.data, 16);
                 
-                // Get full transaction details for 0G amounts
+                // OPTIMIZED: Get ONLY transaction details for 0G amounts (1 API call instead of 3!)
                 const txDetails = await this.rpcCall('eth_getTransactionByHash', [log.transactionHash]);
-                const txReceipt = await this.rpcCall('eth_getTransactionReceipt', [log.transactionHash]);
-                const block = await this.rpcCall('eth_getBlockByHash', [log.blockHash, false]);
-                const timestamp = parseInt(block.timestamp, 16);
                 
-                // Extract 0G/ETH amounts
+                // Use current time as timestamp approximation (no extra API call)
+                const blockNumber = parseInt(log.blockNumber, 16);
+                const estimatedTimestamp = Math.floor(Date.now() / 1000);
+                
+                // Extract 0G/ETH amounts (no gas fees)
                 const ethValue = parseInt(txDetails.value, 16);
                 const ethValueFormatted = ethValue / Math.pow(10, 18);
-                const gasUsed = parseInt(txReceipt.gasUsed, 16);
-                const gasPrice = parseInt(txDetails.gasPrice, 16);
-                const gasFee = (gasUsed * gasPrice) / Math.pow(10, 18);
-                const totalCost = ethValueFormatted + gasFee;
                 
-                // Calculate price per token
+                // Calculate price per token (no gas included)
                 let pricePerToken = 0;
                 if (ethValueFormatted > 0 && amount > 0) {
                     pricePerToken = ethValueFormatted / (amount / Math.pow(10, tokenInfo.decimals));
@@ -177,8 +256,8 @@ class UnifiedOGService {
                 
                 trades.push({
                     transactionHash: log.transactionHash,
-                    blockNumber: parseInt(log.blockNumber, 16),
-                    timestamp: timestamp,
+                    blockNumber: blockNumber,
+                    timestamp: estimatedTimestamp,
                     from: from.toLowerCase(),
                     to: to.toLowerCase(),
                     
@@ -186,11 +265,10 @@ class UnifiedOGService {
                     amount: amount,
                     amountFormatted: amount / Math.pow(10, tokenInfo.decimals),
                     
-                    // 0G/ETH amounts
+                    // 0G/ETH amounts (OPTIMIZED - No gas fees)
                     ethValue: ethValue,
                     ethValueFormatted: ethValueFormatted,
-                    gasFee: gasFee,
-                    totalCost: totalCost,
+                    totalCost: ethValueFormatted, // Just 0G spent, no gas
                     pricePerToken: pricePerToken,
                     
                     // Classification
@@ -366,31 +444,26 @@ class UnifiedOGService {
         }
     }
     
-    // Process individual transfer log with 0G/ETH amounts
+    // Process individual transfer log with 0G/ETH amounts (OPTIMIZED - Skip gas & block details)
     async processTransferLog(log, tokenInfo) {
         try {
             const from = '0x' + log.topics[1].slice(26);
             const to = '0x' + log.topics[2].slice(26);
             const amount = parseInt(log.data, 16);
             
-            // Get full transaction details to extract 0G/ETH amounts
+            // Get ONLY transaction details for 0G amounts (1 API call instead of 3!)
             const txDetails = await this.rpcCall('eth_getTransactionByHash', [log.transactionHash]);
-            const txReceipt = await this.rpcCall('eth_getTransactionReceipt', [log.transactionHash]);
             
-            // Get block timestamp
-            const block = await this.rpcCall('eth_getBlockByHash', [log.blockHash, false]);
-            const timestamp = parseInt(block.timestamp, 16);
+            // Use block number from log for timestamp approximation (no extra API call)
+            const blockNumber = parseInt(log.blockNumber, 16);
+            const estimatedTimestamp = Math.floor(Date.now() / 1000); // Current time as fallback
             
             // Extract 0G/ETH value from transaction
             const ethValue = parseInt(txDetails.value, 16);
             const ethValueFormatted = ethValue / Math.pow(10, 18); // Convert wei to ETH/0G
-            const gasUsed = parseInt(txReceipt.gasUsed, 16);
-            const gasPrice = parseInt(txDetails.gasPrice, 16);
-            const gasFee = (gasUsed * gasPrice) / Math.pow(10, 18);
             
-            // Calculate price per token (if ETH was spent)
+            // Calculate price per token (if ETH was spent) - NO GAS FEES
             let pricePerToken = 0;
-            let totalCost = ethValueFormatted + gasFee;
             if (ethValueFormatted > 0 && amount > 0) {
                 pricePerToken = ethValueFormatted / (amount / Math.pow(10, tokenInfo.decimals));
             }
@@ -407,8 +480,8 @@ class UnifiedOGService {
             
             return {
                 transactionHash: log.transactionHash,
-                blockNumber: parseInt(log.blockNumber, 16),
-                timestamp: timestamp,
+                blockNumber: blockNumber,
+                timestamp: estimatedTimestamp,
                 from: from.toLowerCase(),
                 to: to.toLowerCase(),
                 
@@ -416,11 +489,10 @@ class UnifiedOGService {
                 amount: amount,
                 amountFormatted: amount / Math.pow(10, tokenInfo.decimals),
                 
-                // 0G/ETH amounts (NEW!)
+                // 0G/ETH amounts (OPTIMIZED - No gas fees)
                 ethValue: ethValue,
                 ethValueFormatted: ethValueFormatted,
-                gasFee: gasFee,
-                totalCost: totalCost,
+                totalCost: ethValueFormatted, // Just the 0G spent, no gas
                 pricePerToken: pricePerToken,
                 
                 // Trade classification

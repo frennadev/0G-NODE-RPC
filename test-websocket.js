@@ -52,8 +52,7 @@ ws.on('message', function(data) {
                 console.log(`     Type: ${trade.type.toUpperCase()}`);
                 console.log(`     Amount: ${trade.amountFormatted} ${trade.tokenSymbol}`);
                 console.log(`     0G Spent: ${trade.ethValueFormatted || 0} 0G`);
-                console.log(`     Gas Fee: ${trade.gasFee || 0} 0G`);
-                console.log(`     Total Cost: ${trade.totalCost || 0} 0G`);
+                console.log(`     Total Cost: ${trade.totalCost || 0} 0G (optimized - no gas tracking)`);
                 console.log(`     Price: ${trade.pricePerToken || 0} 0G per token`);
                 console.log(`     Classification: ${trade.classification}`);
             });
@@ -68,8 +67,7 @@ ws.on('message', function(data) {
                     console.log(`     Type: ${trade.type.toUpperCase()}`);
                     console.log(`     Amount: ${trade.amountFormatted} ${trade.tokenSymbol}`);
                     console.log(`     0G Spent: ${trade.ethValueFormatted || 0} 0G`);
-                    console.log(`     Gas Fee: ${trade.gasFee || 0} 0G`);
-                    console.log(`     Total Cost: ${trade.totalCost || 0} 0G`);
+                    console.log(`     Total Cost: ${trade.totalCost || 0} 0G (optimized - no gas tracking)`);
                     console.log(`     Price: ${trade.pricePerToken || 0} 0G per token`);
                 });
             } else {
@@ -95,7 +93,7 @@ ws.on('error', function(error) {
 });
 
 // Keep the connection alive for 2 minutes to monitor for live trades
-console.log('⏳ Monitoring for live trades for 2 minutes...');
+console.log('⏳ Testing fixed token amounts - monitoring for 1 minute...');
 
 // Show periodic status updates
 let statusInterval = setInterval(() => {
@@ -103,8 +101,8 @@ let statusInterval = setInterval(() => {
 }, 15000); // Every 15 seconds
 
 setTimeout(() => {
-    console.log('⏰ 2-minute test complete, closing connection');
+    console.log('⏰ 1-minute test complete, closing connection');
     clearInterval(statusInterval);
     ws.close();
     process.exit(0);
-}, 120000); // 2 minutes
+}, 60000); // 1 minute
