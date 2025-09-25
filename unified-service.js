@@ -57,13 +57,31 @@ class UnifiedOGService {
         // Start request queue processor
         this.startRequestQueueProcessor();
         
-        // Start real-time monitoring
-        this.startRealTimeMonitoring();
+        // Only start real-time monitoring on the first PM2 instance (or standalone)
+        this.shouldMonitorBlocks = this.determineShouldMonitorBlocks();
+        if (this.shouldMonitorBlocks) {
+            console.log(`🎯 This instance (${process.env.pm_id || 'standalone'}) will monitor blocks`);
+            this.startRealTimeMonitoring();
+        } else {
+            console.log(`⚡ This instance (${process.env.pm_id}) will handle RPC/WebSocket only`);
+        }
         
         console.log(`🚀 Unified 0G Service starting...`);
         console.log(`📊 HTTP Server: http://localhost:${this.port}`);
         console.log(`🔴 WebSocket: ws://localhost:${this.wsPort}`);
         console.log(`⚡ Rate Limiting: ${this.maxRequestsPerSecond} RPS max`);
+    }
+
+    // Determine if this instance should monitor blocks (PM2 clustering coordination)
+    determineShouldMonitorBlocks() {
+        // If not running under PM2, always monitor
+        if (!process.env.pm_id) {
+            return true;
+        }
+        
+        // Only the first PM2 instance (pm_id === '0') monitors blocks
+        const pmId = parseInt(process.env.pm_id);
+        return pmId === 0;
     }
 
     // Rate limiting request queue processor
@@ -400,11 +418,26 @@ class UnifiedOGService {
                 }
                 
                 if (currentBlockNumber > lastProcessedBlock) {
-                    console.log(`🆕 New block detected: ${currentBlockNumber} (processing ${currentBlockNumber - lastProcessedBlock} new blocks)`);
+                    const blocksToProcess = currentBlockNumber - lastProcessedBlock;
                     
-                    // Process new blocks
-                    for (let blockNum = lastProcessedBlock + 1; blockNum <= currentBlockNumber; blockNum++) {
-                        await this.processNewBlock(blockNum);
+                    // CATCH-UP PROTECTION: Don't process too many blocks at once
+                    const maxBlocksPerCycle = this.getMaxBlocksForCurrentLoad();
+                    
+                    if (blocksToProcess > maxBlocksPerCycle) {
+                        console.log(`⚠️ Too far behind (${blocksToProcess} blocks), skipping to recent blocks`);
+                        // Jump to recent blocks instead of processing everything
+                        lastProcessedBlock = currentBlockNumber - Math.min(maxBlocksPerCycle, 10);
+                        console.log(`🎯 Jumped to block ${lastProcessedBlock}, will process last ${Math.min(maxBlocksPerCycle, 10)} blocks`);
+                    }
+                    
+                    const actualBlocksToProcess = currentBlockNumber - lastProcessedBlock;
+                    if (actualBlocksToProcess > 0) {
+                        console.log(`🆕 New block detected: ${currentBlockNumber} (processing ${actualBlocksToProcess} new blocks)`);
+                        
+                        // Process new blocks (now limited)
+                        for (let blockNum = lastProcessedBlock + 1; blockNum <= currentBlockNumber; blockNum++) {
+                            await this.processNewBlock(blockNum);
+                        }
                     }
                     
                     lastProcessedBlock = currentBlockNumber;
@@ -505,6 +538,27 @@ class UnifiedOGService {
             return 10;
         } else {
             // Normal operation - process more trades
+            return 20;
+        }
+    }
+    
+    // Adaptive block processing - adjust max blocks based on current system load
+    getMaxBlocksForCurrentLoad() {
+        const queueLength = this.requestQueue.length;
+        const backoffLevel = this.rateLimitBackoff;
+        
+        // Adaptive limits for block catch-up based on system stress
+        if (backoffLevel > 10000) {
+            // Heavy rate limiting - process very few blocks
+            return 3;
+        } else if (backoffLevel > 5000 || queueLength > 50) {
+            // Moderate rate limiting - process fewer blocks
+            return 5;
+        } else if (queueLength > 20) {
+            // Queue building up - limit block processing
+            return 10;
+        } else {
+            // Normal operation - can process more blocks
             return 20;
         }
     }
