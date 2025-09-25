@@ -115,18 +115,31 @@ class UnifiedOGService {
         this.isProcessingQueue = false;
     }
 
-    // RPC call to 0G chain (now with rate limiting)
-    async rpcCall(method, params = [], network = 'mainnet') {
+    // RPC call to 0G chain (now with rate limiting and prioritization)
+    async rpcCall(method, params = [], network = 'mainnet', priority = 'normal') {
         return new Promise((resolve, reject) => {
-            // Add to queue for rate limiting
-            this.requestQueue.push({
+            const request = {
                 method,
                 params,
                 network,
                 resolve,
                 reject,
-                timestamp: Date.now()
-            });
+                timestamp: Date.now(),
+                priority: priority // 'high', 'normal', 'low'
+            };
+            
+            // Priority-based insertion
+            if (priority === 'high') {
+                // Insert at beginning for high priority (live trades)
+                this.requestQueue.unshift(request);
+            } else if (priority === 'low') {
+                // Add to end for low priority (historical data)
+                this.requestQueue.push(request);
+            } else {
+                // Normal priority - insert in middle
+                const highPriorityCount = this.requestQueue.filter(r => r.priority === 'high').length;
+                this.requestQueue.splice(highPriorityCount, 0, request);
+            }
         });
     }
     
@@ -219,16 +232,34 @@ class UnifiedOGService {
                 toBlock: 'latest',
                 address: tokenAddress,
                 topics: [this.eventSignatures.transfer]
-            }]);
+            }], 'mainnet', 'low'); // LOW PRIORITY for historical data
 
+            // LATEST-FIRST: Take most recent logs and prioritize them
+            const recentLogs = logs.slice(-limit); // Get last N logs (most recent)
+            const maxProcessableTrades = Math.min(limit, this.getMaxTradesForCurrentLoad() * 5); // Allow more for historical
+            
+            let logsToProcess = recentLogs;
+            if (recentLogs.length > maxProcessableTrades) {
+                // Sort by block number + logIndex (latest first) 
+                logsToProcess = recentLogs
+                    .sort((a, b) => {
+                        const blockDiff = parseInt(b.blockNumber, 16) - parseInt(a.blockNumber, 16);
+                        if (blockDiff !== 0) return blockDiff;
+                        return parseInt(b.logIndex, 16) - parseInt(a.logIndex, 16);
+                    })
+                    .slice(0, maxProcessableTrades);
+                
+                console.log(`⚡ Historical request: Processing ${maxProcessableTrades} most recent trades (skipping ${recentLogs.length - maxProcessableTrades} older ones)`);
+            }
+            
             const trades = [];
-            for (const log of logs.slice(-limit)) {
+            for (const log of logsToProcess) {
                 const from = '0x' + log.topics[1].slice(26);
                 const to = '0x' + log.topics[2].slice(26);
                 const amount = parseInt(log.data, 16);
                 
                 // OPTIMIZED: Get ONLY transaction details for 0G amounts (1 API call instead of 3!)
-                const txDetails = await this.rpcCall('eth_getTransactionByHash', [log.transactionHash]);
+                const txDetails = await this.rpcCall('eth_getTransactionByHash', [log.transactionHash], 'mainnet', 'low'); // LOW PRIORITY for historical trade details
                 
                 // Use current time as timestamp approximation (no extra API call)
                 const blockNumber = parseInt(log.blockNumber, 16);
@@ -404,7 +435,7 @@ class UnifiedOGService {
                     toBlock: blockHex,
                     address: tokenAddress,
                     topics: [this.eventSignatures.transfer]
-                }]);
+                }], 'mainnet', 'high'); // HIGH PRIORITY for live trades
                 
                 if (logs.length > 0) {
                     console.log(`💰 Found ${logs.length} new transfers for ${tokenAddress} in block ${blockNumber}`);
@@ -418,9 +449,22 @@ class UnifiedOGService {
                         this.trackedTokens.set(tokenAddress, tokenInfo);
                     }
                     
+                    // LATEST-FIRST STRATEGY: Limit trades per block to stay functional
+                    const maxTradesPerBlock = this.getMaxTradesForCurrentLoad();
+                    let logsToProcess = logs;
+                    
+                    if (logs.length > maxTradesPerBlock) {
+                        // Sort by logIndex (latest first) and take most recent
+                        logsToProcess = logs
+                            .sort((a, b) => parseInt(b.logIndex, 16) - parseInt(a.logIndex, 16))
+                            .slice(0, maxTradesPerBlock);
+                        
+                        console.log(`⚡ High activity: Processing ${maxTradesPerBlock} most recent trades (skipping ${logs.length - maxTradesPerBlock} older ones)`);
+                    }
+                    
                     const newTrades = [];
                     
-                    for (const log of logs) {
+                    for (const log of logsToProcess) {
                         const trade = await this.processTransferLog(log, tokenInfo);
                         if (trade) {
                             newTrades.push(trade);
@@ -444,6 +488,27 @@ class UnifiedOGService {
         }
     }
     
+    // Adaptive load management - adjust max trades based on current system load
+    getMaxTradesForCurrentLoad() {
+        const queueLength = this.requestQueue.length;
+        const backoffLevel = this.rateLimitBackoff;
+        
+        // Adaptive limits based on system stress
+        if (backoffLevel > 10000) {
+            // Heavy rate limiting - very conservative
+            return 3;
+        } else if (backoffLevel > 5000 || queueLength > 50) {
+            // Moderate rate limiting - conservative  
+            return 5;
+        } else if (queueLength > 20) {
+            // Queue building up - reduce load
+            return 10;
+        } else {
+            // Normal operation - process more trades
+            return 20;
+        }
+    }
+    
     // Process individual transfer log with 0G/ETH amounts (OPTIMIZED - Skip gas & block details)
     async processTransferLog(log, tokenInfo) {
         try {
@@ -452,7 +517,7 @@ class UnifiedOGService {
             const amount = parseInt(log.data, 16);
             
             // Get ONLY transaction details for 0G amounts (1 API call instead of 3!)
-            const txDetails = await this.rpcCall('eth_getTransactionByHash', [log.transactionHash]);
+            const txDetails = await this.rpcCall('eth_getTransactionByHash', [log.transactionHash], 'mainnet', 'high'); // HIGH PRIORITY for live trade details
             
             // Use block number from log for timestamp approximation (no extra API call)
             const blockNumber = parseInt(log.blockNumber, 16);
