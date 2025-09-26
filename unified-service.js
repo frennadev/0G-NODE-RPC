@@ -748,10 +748,11 @@ class UnifiedOGService {
                               req.headers['authorization']?.replace('Bearer ', '') ||
                               query.apikey;
 
-                const validation = this.apiAuth.validateRequest(apiKey, path);
+                const validation = await this.apiAuth.validateRequest(apiKey, path);
                 
                 if (!validation.valid) {
-                    res.writeHead(validation.code, { 'Content-Type': 'application/json' });
+                    const statusCode = validation.code || 401; // Default to 401 if code is undefined
+                    res.writeHead(statusCode, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({
                         error: validation.error,
                         code: validation.code,
@@ -906,10 +907,10 @@ class UnifiedOGService {
             // Create new API key
             let body = '';
             req.on('data', chunk => body += chunk);
-            req.on('end', () => {
+            req.on('end', async () => {
                 try {
                     const { email, tier } = JSON.parse(body);
-                    const apiKey = this.apiAuth.generateKey(email, tier);
+                    const apiKey = await this.apiAuth.generateKey(email, tier);
                     
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({
@@ -929,7 +930,7 @@ class UnifiedOGService {
         } else if (path === '/admin/keys') {
             // Get all API keys
             try {
-                const keys = this.apiAuth.getAllKeys();
+                const keys = await this.apiAuth.getAllKeys();
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({
                     success: true,
