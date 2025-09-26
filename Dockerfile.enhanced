@@ -24,6 +24,7 @@ COPY complete-trade-dashboard.html ./public/
 COPY TRADE_STREAMING_API.md ./docs/
 COPY api-auth.js ./
 COPY mongodb-auth.js ./
+COPY token-price-service.js ./
 COPY admin-panel.html ./
 
 # Create directories

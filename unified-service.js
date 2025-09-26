@@ -14,6 +14,8 @@ try {
     APIAuth = require('./api-auth');
 }
 
+const TokenPriceService = require('./token-price-service');
+
 // Unified 0G Service - RPC Proxy + Trade Streaming
 class UnifiedOGService {
     constructor() {
@@ -24,6 +26,9 @@ class UnifiedOGService {
         
         // API Authentication
         this.apiAuth = new APIAuth();
+        
+        // Token Price Service
+        this.tokenPriceService = new TokenPriceService();
         
         // RPC Proxy Stats
         this.rpcStats = {
@@ -999,6 +1004,12 @@ class UnifiedOGService {
                 break;
                 
             default:
+                // Handle token price endpoints
+                if (path.startsWith('/api/token-price/')) {
+                    await this.handleTokenPriceRequest(req, res, path, query);
+                } else if (path === '/api/token-prices' && req.method === 'POST') {
+                    await this.handleMultipleTokenPricesRequest(req, res);
+                } else
                 if (path.startsWith('/trades/')) {
                     await this.handleTradeAPI(req, res, path, query);
                 } else {
@@ -1041,6 +1052,115 @@ class UnifiedOGService {
         } catch (error) {
             res.writeHead(500);
             res.end(JSON.stringify({ error: error.message }));
+        }
+    }
+
+    // Handle single token price request
+    async handleTokenPriceRequest(req, res, path, query) {
+        try {
+            // Extract token address from path: /api/token-price/{address}
+            const pathParts = path.split('/');
+            const tokenAddress = pathParts[3];
+            
+            if (!tokenAddress) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    success: false,
+                    error: 'Token address required',
+                    usage: 'GET /api/token-price/{tokenAddress}?symbol=SYMBOL'
+                }));
+                return;
+            }
+
+            const tokenSymbol = query.symbol || null;
+            const includeOGConversion = query.include0g === 'true';
+
+            console.log(`🔍 Fetching price for token ${tokenAddress}${tokenSymbol ? ` (${tokenSymbol})` : ''}`);
+
+            let priceData;
+            if (includeOGConversion) {
+                priceData = await this.tokenPriceService.getTokenPriceWithOGConversion(tokenAddress, tokenSymbol);
+            } else {
+                priceData = await this.tokenPriceService.getTokenPrice(tokenAddress, tokenSymbol);
+            }
+
+            if (priceData) {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    success: true,
+                    tokenAddress: tokenAddress,
+                    tokenSymbol: tokenSymbol,
+                    price: priceData,
+                    timestamp: Date.now()
+                }));
+            } else {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    success: false,
+                    error: 'Price not found',
+                    tokenAddress: tokenAddress,
+                    message: 'Token price not available from any source',
+                    timestamp: Date.now()
+                }));
+            }
+        } catch (error) {
+            console.error('Token price request error:', error);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                success: false,
+                error: error.message,
+                timestamp: Date.now()
+            }));
+        }
+    }
+
+    // Handle multiple token prices request
+    async handleMultipleTokenPricesRequest(req, res) {
+        try {
+            let body = '';
+            req.on('data', chunk => body += chunk);
+            req.on('end', async () => {
+                try {
+                    const requestData = JSON.parse(body);
+                    const tokens = requestData.tokens;
+
+                    if (!tokens || !Array.isArray(tokens)) {
+                        res.writeHead(400, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({
+                            success: false,
+                            error: 'Invalid request format',
+                            usage: 'POST /api/token-prices with body: {"tokens": [{"address": "0x...", "symbol": "TOKEN"}, ...]}'
+                        }));
+                        return;
+                    }
+
+                    console.log(`🔍 Fetching prices for ${tokens.length} tokens`);
+                    const priceResults = await this.tokenPriceService.getMultipleTokenPrices(tokens);
+
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({
+                        success: true,
+                        count: priceResults.length,
+                        prices: priceResults,
+                        timestamp: Date.now()
+                    }));
+                } catch (parseError) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({
+                        success: false,
+                        error: 'Invalid JSON format',
+                        timestamp: Date.now()
+                    }));
+                }
+            });
+        } catch (error) {
+            console.error('Multiple token prices request error:', error);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                success: false,
+                error: error.message,
+                timestamp: Date.now()
+            }));
         }
     }
 

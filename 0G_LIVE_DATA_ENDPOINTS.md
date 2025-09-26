@@ -581,3 +581,88 @@ const response = await fetch('https://zerog-node-rpc.onrender.com/api/convert', 
 
 **Your node provides everything needed for comprehensive 0G Chain analysis and real-time monitoring!** 🚀
 
+---
+
+## 💰 **Token Price Data (NEW!)**
+
+### Get Any Token Price in USD
+```bash
+GET /api/token-price/{tokenAddress}?symbol=SYMBOL&include0g=true
+```
+
+**Parameters:**
+- `tokenAddress` (required): Contract address of the token
+- `symbol` (optional): Token symbol for better lookup
+- `include0g` (optional): Include 0G conversion rate
+
+**Examples:**
+```bash
+# Get USDT price
+curl "https://zerog-node-rpc.onrender.com/api/token-price/0xdAC17F958D2ee523a2206206994597C13D831ec7?symbol=USDT"
+
+# Get WETH price with 0G conversion
+curl "https://zerog-node-rpc.onrender.com/api/token-price/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2?symbol=WETH&include0g=true"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "tokenAddress": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+  "tokenSymbol": "USDT",
+  "price": {
+    "usd": 1.0001,
+    "change24h": 0.02,
+    "marketCap": 83000000000,
+    "volume24h": 28000000000,
+    "source": "CoinGecko",
+    "lastUpdated": 1695734567890,
+    "priceIn0G": 42.74,  // Only if include0g=true
+    "ogPrice": 0.0234    // Only if include0g=true
+  },
+  "timestamp": 1695734567890
+}
+```
+
+### Get Multiple Token Prices
+```bash
+POST /api/token-prices
+Content-Type: application/json
+
+{
+  "tokens": [
+    {"address": "0xdAC17F958D2ee523a2206206994597C13D831ec7", "symbol": "USDT"},
+    {"address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", "symbol": "WETH"}
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "count": 2,
+  "prices": [
+    {
+      "address": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+      "symbol": "USDT",
+      "success": true,
+      "price": {
+        "usd": 1.0001,
+        "change24h": 0.02,
+        "source": "CoinGecko"
+      }
+    }
+  ],
+  "timestamp": 1695734567890
+}
+```
+
+### 🔥 **Key Features:**
+- ✅ **Multi-Source Price Feeds** - CoinGecko, DEX aggregators, on-chain derivation
+- ✅ **0G Conversion** - Get token prices in 0G terms
+- ✅ **Bulk Price Fetching** - Get multiple token prices in one request
+- ✅ **Cached Results** - 5-minute cache for optimal performance
+- ✅ **Fallback Sources** - Multiple price sources for reliability
+- ✅ **Market Data** - 24h change, market cap, volume included
+
