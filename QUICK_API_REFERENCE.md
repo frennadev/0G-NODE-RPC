@@ -35,6 +35,15 @@ curl -X POST https://zerog-node-rpc.onrender.com \
   -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
 ```
 
+### **0G Price in USD**
+```bash
+# Get current 0G price
+curl https://zerog-node-rpc.onrender.com/api/price
+
+# Get trades with USD values
+curl "https://zerog-node-rpc.onrender.com/api/trades/0xToken?includeUSD=true"
+```
+
 ### **Transfer Events**
 ```bash
 curl -X POST https://zerog-node-rpc.onrender.com \
@@ -49,8 +58,10 @@ curl -X POST https://zerog-node-rpc.onrender.com \
 
 ## 📊 **Key Features**
 - ✅ Real-time trade streaming
+- ✅ USD price conversion (0G = $3.79)
 - ✅ 40 RPS rate limit
 - ✅ Whale detection
 - ✅ Price tracking
 - ✅ Portfolio monitoring
 - ✅ Event log analysis
+

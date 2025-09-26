@@ -508,6 +508,66 @@ curl -X POST "https://zerog-node-rpc.onrender.com?network=testnet" \
 
 ---
 
+## 💰 **USD Price Data (NEW!)**
+
+### **🔥 Get 0G Token Price in USD**
+```bash
+# Get current 0G price with market data
+GET https://zerog-node-rpc.onrender.com/api/price
+
+# Response
+{
+  "usd": 3.79,
+  "eth": 0.0009758,
+  "change24h": -4.75,
+  "marketCap": 815455573.70,
+  "volume24h": 279246728.21,
+  "source": "CoinGecko",
+  "lastUpdated": 1758883778643,
+  "cacheAge": 0
+}
+```
+
+### **💹 Enhanced Trade Data with USD Values**
+All trade endpoints now include USD pricing:
+```bash
+# Get trades with USD values
+curl "https://zerog-node-rpc.onrender.com/api/trades/0x59ef6F3943bBdFE2fB19565037Ac85071223E94C?limit=10&includeUSD=true"
+```
+
+**Enhanced Response Format:**
+```json
+{
+  "trades": [
+    {
+      "transactionHash": "0xabc123...",
+      "amount": "54.200061641",
+      "ethValueFormatted": 0.099,
+      "pricePerToken": 0.00182,
+      "usdValue": 0.375,
+      "pricePerTokenUSD": 0.00692,
+      "ogPriceUSD": 3.79,
+      "ogChange24h": -4.75,
+      "priceSource": "CoinGecko",
+      "type": "BUY"
+    }
+  ]
+}
+```
+
+### **🧮 USD Conversion Utilities**
+```javascript
+// Convert any 0G amount to USD
+const response = await fetch('https://zerog-node-rpc.onrender.com/api/convert', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount: 10.5, from: '0G', to: 'USD' })
+});
+// Returns: { "amount": 10.5, "usdValue": 39.795, "rate": 3.79 }
+```
+
+---
+
 ## 🎉 **Your Complete 0G Data Arsenal**
 
 ✅ **Live Trade Streaming** - Real-time buy/sell detection  
@@ -520,3 +580,4 @@ curl -X POST "https://zerog-node-rpc.onrender.com?network=testnet" \
 ✅ **Contract Analysis** - Code and interaction data  
 
 **Your node provides everything needed for comprehensive 0G Chain analysis and real-time monitoring!** 🚀
+

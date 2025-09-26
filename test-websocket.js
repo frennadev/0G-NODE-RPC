@@ -93,7 +93,7 @@ ws.on('error', function(error) {
 });
 
 // Keep the connection alive for 2 minutes to monitor for live trades
-console.log('⏳ Testing fixed token amounts - monitoring for 1 minute...');
+console.log('🚀 Testing OPTIMIZED Live Stream - monitoring for 5 minutes...');
 
 // Show periodic status updates
 let statusInterval = setInterval(() => {
@@ -101,8 +101,8 @@ let statusInterval = setInterval(() => {
 }, 15000); // Every 15 seconds
 
 setTimeout(() => {
-    console.log('⏰ 1-minute test complete, closing connection');
+    console.log('⏰ 5-minute test complete, closing connection');
     clearInterval(statusInterval);
     ws.close();
     process.exit(0);
-}, 60000); // 1 minute
+}, 300000); // 5 minutes
