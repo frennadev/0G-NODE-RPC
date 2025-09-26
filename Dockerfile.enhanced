@@ -22,6 +22,8 @@ COPY ecosystem.config.js ./
 COPY package*.json ./
 COPY complete-trade-dashboard.html ./public/
 COPY TRADE_STREAMING_API.md ./docs/
+COPY api-auth.js ./
+COPY admin-panel.html ./
 
 # Create directories
 RUN mkdir -p public docs logs
