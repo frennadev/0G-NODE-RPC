@@ -4,7 +4,15 @@ const WebSocket = require('ws');
 const url = require('url');
 const fs = require('fs');
 const path = require('path');
-const APIAuth = require('./api-auth');
+// Try MongoDB first, fallback to file-based auth
+let APIAuth;
+try {
+    APIAuth = require('./mongodb-auth');
+    console.log('🍃 Using MongoDB for API authentication');
+} catch (error) {
+    console.log('⚠️ MongoDB not available, using file-based auth');
+    APIAuth = require('./api-auth');
+}
 
 // Unified 0G Service - RPC Proxy + Trade Streaming
 class UnifiedOGService {
