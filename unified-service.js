@@ -4,6 +4,7 @@ const WebSocket = require('ws');
 const url = require('url');
 const fs = require('fs');
 const path = require('path');
+const APIAuth = require('./api-auth');
 
 // Unified 0G Service - RPC Proxy + Trade Streaming
 class UnifiedOGService {
@@ -12,6 +13,9 @@ class UnifiedOGService {
         this.testnetRpcUrl = process.env.TESTNET_RPC || 'https://evmrpc-testnet.0g.ai/';
         this.port = process.env.PORT || process.env.PROXY_PORT || 26657;
         this.wsPort = process.env.WS_PORT || 26658;
+        
+        // API Authentication
+        this.apiAuth = new APIAuth();
         
         // RPC Proxy Stats
         this.rpcStats = {
@@ -718,7 +722,7 @@ class UnifiedOGService {
             // CORS headers
             res.setHeader('Access-Control-Allow-Origin', '*');
             res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-            res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-Key, Authorization');
             
             if (req.method === 'OPTIONS') {
                 res.writeHead(200);
@@ -730,8 +734,37 @@ class UnifiedOGService {
             const path = parsedUrl.pathname;
             const query = parsedUrl.query;
             
+            // API Authentication (skip for health, admin, and root RPC)
+            if (path !== '/health' && !path.startsWith('/admin') && path !== '/') {
+                const apiKey = req.headers['x-api-key'] || 
+                              req.headers['authorization']?.replace('Bearer ', '') ||
+                              query.apikey;
+
+                const validation = this.apiAuth.validateRequest(apiKey, path);
+                
+                if (!validation.valid) {
+                    res.writeHead(validation.code, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({
+                        error: validation.error,
+                        code: validation.code,
+                        message: validation.code === 429 ? 
+                            'Rate limit exceeded. Upgrade your plan at /admin' :
+                            'Invalid API key. Get your key at /admin'
+                    }));
+                    return;
+                }
+
+                // Add rate limit headers
+                res.setHeader('X-RateLimit-Tier', validation.tier);
+                res.setHeader('X-RateLimit-Daily-Remaining', validation.usage.dailyLimit - validation.usage.daily);
+                res.setHeader('X-RateLimit-Monthly-Remaining', validation.usage.monthlyLimit - validation.usage.monthly);
+            }
+            
             try {
-                if (req.method === 'POST' && path === '/') {
+                if (path.startsWith('/admin')) {
+                    // Handle admin panel
+                    await this.handleAdminRequest(req, res, path, query);
+                } else if (req.method === 'POST' && path === '/') {
                     // Handle RPC requests
                     await this.handleRPCRequest(req, res, query);
                 } else if (req.method === 'GET') {
@@ -852,6 +885,64 @@ class UnifiedOGService {
                 }));
             }
         });
+    }
+
+    // Handle admin panel requests
+    async handleAdminRequest(req, res, path, query) {
+        if (path === '/admin' || path === '/admin/') {
+            // Serve admin panel HTML
+            try {
+                const adminHTML = fs.readFileSync(path.join(__dirname, 'admin-panel.html'), 'utf8');
+                res.writeHead(200, { 'Content-Type': 'text/html' });
+                res.end(adminHTML);
+            } catch (error) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Admin panel not found' }));
+            }
+        } else if (path === '/admin/create-key' && req.method === 'POST') {
+            // Create new API key
+            let body = '';
+            req.on('data', chunk => body += chunk);
+            req.on('end', () => {
+                try {
+                    const { email, tier } = JSON.parse(body);
+                    const apiKey = this.apiAuth.generateKey(email, tier);
+                    
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({
+                        success: true,
+                        apiKey: apiKey,
+                        email: email,
+                        tier: tier
+                    }));
+                } catch (error) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({
+                        success: false,
+                        error: error.message
+                    }));
+                }
+            });
+        } else if (path === '/admin/keys') {
+            // Get all API keys
+            try {
+                const keys = this.apiAuth.getAllKeys();
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    success: true,
+                    keys: keys
+                }));
+            } catch (error) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    success: false,
+                    error: error.message
+                }));
+            }
+        } else {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Admin endpoint not found' }));
+        }
     }
 
     // Handle API requests (trade streaming functionality)
