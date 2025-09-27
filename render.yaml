@@ -27,6 +27,8 @@ services:
         value: http://localhost:26657/
       - key: MONGODB_URL
         value: mongodb+srv://0gadmin:henryadmin0g@0g-tg-bot.txhptqg.mongodb.net/apikeys?retryWrites=true&w=majority&appName=0G-TG-BOT
+      - key: HELIUS_RPC
+        value: https://mainnet.helius-rpc.com/?api-key=0278a27b-577f-4ba7-a29c-414b8ef723d7
     # No disk needed - proxy doesn't store data!
     healthCheckPath: /health
     numInstances: 1

@@ -21,8 +21,16 @@ class UnifiedOGService {
     constructor() {
         this.rpcUrl = process.env.OFFICIAL_RPC || 'https://evmrpc.0g.ai/';
         this.testnetRpcUrl = process.env.TESTNET_RPC || 'https://evmrpc-testnet.0g.ai/';
+        this.heliusRpcUrl = process.env.HELIUS_RPC || 'https://mainnet.helius-rpc.com/?api-key=0278a27b-577f-4ba7-a29c-414b8ef723d7';
         this.port = process.env.PORT || process.env.PROXY_PORT || 26657;
         this.wsPort = process.env.WS_PORT || 26658;
+        
+        // RPC endpoint pool for load balancing
+        this.rpcEndpoints = [
+            { url: this.rpcUrl, name: '0G_Official', weight: 1, failures: 0, lastFailure: 0 },
+            { url: this.heliusRpcUrl, name: 'Helius', weight: 1, failures: 0, lastFailure: 0 }
+        ];
+        this.currentRpcIndex = 0;
         
         // API Authentication
         this.apiAuth = new APIAuth();
@@ -87,6 +95,60 @@ class UnifiedOGService {
         console.log(`📊 HTTP Server: http://localhost:${this.port}`);
         console.log(`🔴 WebSocket: ws://localhost:${this.wsPort}`);
         console.log(`⚡ Rate Limiting: ${this.maxRequestsPerSecond} RPS max`);
+    }
+
+    // Smart RPC endpoint selection with load balancing and failover
+    getNextRpcEndpoint() {
+        const now = Date.now();
+        const failureTimeout = 300000; // 5 minutes before retrying failed endpoint
+        
+        // Filter available endpoints (not recently failed)
+        const availableEndpoints = this.rpcEndpoints.filter(endpoint => {
+            return endpoint.failures === 0 || (now - endpoint.lastFailure) > failureTimeout;
+        });
+        
+        if (availableEndpoints.length === 0) {
+            // All endpoints failed recently, reset failure counts and use primary
+            console.log('⚠️ All RPC endpoints failed recently, resetting...');
+            this.rpcEndpoints.forEach(endpoint => {
+                endpoint.failures = 0;
+                endpoint.lastFailure = 0;
+            });
+            return this.rpcEndpoints[0];
+        }
+        
+        // Round-robin selection among available endpoints
+        this.currentRpcIndex = (this.currentRpcIndex + 1) % availableEndpoints.length;
+        const selectedEndpoint = availableEndpoints[this.currentRpcIndex];
+        
+        return selectedEndpoint;
+    }
+
+    // Mark an RPC endpoint as failed
+    markRpcEndpointFailed(endpointUrl, error) {
+        const endpoint = this.rpcEndpoints.find(ep => ep.url === endpointUrl);
+        if (endpoint) {
+            endpoint.failures++;
+            endpoint.lastFailure = Date.now();
+            console.log(`❌ RPC endpoint ${endpoint.name} failed (${endpoint.failures} failures): ${error.message}`);
+            
+            // If this was our primary endpoint, log the switch
+            if (endpoint === this.rpcEndpoints[0]) {
+                console.log(`🔄 Switching from primary endpoint ${endpoint.name} to backup endpoints`);
+            }
+        }
+    }
+
+    // Get RPC endpoint stats
+    getRpcEndpointStats() {
+        return this.rpcEndpoints.map(endpoint => ({
+            name: endpoint.name,
+            url: endpoint.url.substring(0, 50) + '...',
+            failures: endpoint.failures,
+            lastFailure: endpoint.lastFailure ? new Date(endpoint.lastFailure).toISOString() : null,
+            status: endpoint.failures === 0 ? 'healthy' : 
+                   (Date.now() - endpoint.lastFailure) > 300000 ? 'recovering' : 'failed'
+        }));
     }
 
     // Determine if this instance should monitor blocks (PM2 clustering coordination)
@@ -188,7 +250,14 @@ class UnifiedOGService {
                 id: Date.now()
             });
 
-            const targetUrl = network === 'testnet' ? this.testnetRpcUrl : this.rpcUrl;
+            // Use load balancing for mainnet, direct URL for testnet
+            let targetUrl, selectedEndpoint;
+            if (network === 'testnet') {
+                targetUrl = this.testnetRpcUrl;
+            } else {
+                selectedEndpoint = this.getNextRpcEndpoint();
+                targetUrl = selectedEndpoint.url;
+            }
             const options = {
                 method: 'POST',
                 headers: {
@@ -204,17 +273,36 @@ class UnifiedOGService {
                     try {
                         const response = JSON.parse(body);
                         if (response.error) {
-                            reject(new Error(response.error.message));
+                            const error = new Error(response.error.message);
+                            // Mark endpoint as failed for rate limits and server errors
+                            if (selectedEndpoint && (
+                                response.error.message.includes('rate limit') ||
+                                response.error.message.includes('Too many requests') ||
+                                res.statusCode >= 500
+                            )) {
+                                this.markRpcEndpointFailed(targetUrl, error);
+                            }
+                            reject(error);
                         } else {
                             resolve(response.result);
                         }
                     } catch (e) {
+                        // Mark endpoint as failed for parsing errors (likely server issues)
+                        if (selectedEndpoint) {
+                            this.markRpcEndpointFailed(targetUrl, e);
+                        }
                         reject(e);
                     }
                 });
             });
 
-            req.on('error', reject);
+            req.on('error', (error) => {
+                // Mark endpoint as failed for connection errors
+                if (selectedEndpoint) {
+                    this.markRpcEndpointFailed(targetUrl, error);
+                }
+                reject(error);
+            });
             req.write(data);
             req.end();
         });
@@ -977,8 +1065,13 @@ class UnifiedOGService {
                     endpoints: {
                         mainnet_rpc: this.rpcUrl,
                         testnet_rpc: this.testnetRpcUrl,
+                        helius_rpc: this.heliusRpcUrl,
                         websocket: `ws://localhost:${this.port}/ws`,
                         websocket_internal: `ws://localhost:${this.wsPort}`
+                    },
+                    rpc_load_balancing: {
+                        enabled: true,
+                        endpoints: this.getRpcEndpointStats()
                     },
                     stats: {
                         total_requests: this.rpcStats.totalRequests,
