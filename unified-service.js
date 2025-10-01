@@ -27,8 +27,9 @@ class UnifiedOGService {
         
         // RPC endpoint pool for load balancing
         this.rpcEndpoints = [
-            { url: this.rpcUrl, name: '0G_Official', weight: 1, failures: 0, lastFailure: 0 },
-            { url: this.heliusRpcUrl, name: 'Helius', weight: 1, failures: 0, lastFailure: 0 }
+            { url: this.rpcUrl, name: '0G_Official', weight: 1, failures: 0, lastFailure: 0 }
+            // Note: Removed Helius RPC as it's a Solana endpoint, not Ethereum-compatible
+            // Only using mainnet endpoint - no testnet backup to avoid data inconsistencies
         ];
         this.currentRpcIndex = 0;
         
