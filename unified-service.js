@@ -416,11 +416,11 @@ class UnifiedOGService {
         try {
             const tokenInfo = await this.getTokenInfo(tokenAddress);
             
-            // Get recent transfer events - LIMITED to last 1000 blocks for performance
+            // Get recent transfer events - LIMITED to last 100 blocks for performance
             const latestBlock = await this.rpcCall('eth_blockNumber');
-            const fromBlock = '0x' + Math.max(0, parseInt(latestBlock, 16) - 1000).toString(16);
+            const fromBlock = '0x' + Math.max(0, parseInt(latestBlock, 16) - 100).toString(16);
             
-            console.log(`🔍 Scanning trades for ${tokenInfo.symbol} from block ${fromBlock} to latest (max 1000 blocks)`);
+            console.log(`🔍 Scanning trades for ${tokenInfo.symbol} from block ${fromBlock} to latest (max 100 blocks for performance)`);
             
             const logs = await this.rpcCall('eth_getLogs', [{
                 fromBlock: fromBlock,
@@ -447,54 +447,75 @@ class UnifiedOGService {
                 console.log(`⚡ Historical request: Processing ${maxProcessableTrades} most recent trades (skipping ${recentLogs.length - maxProcessableTrades} older ones)`);
             }
             
+            // OPTIMIZATION: Batch fetch all transaction data at once for ETH value calculation
+            const uniqueTxHashes = [...new Set(logsToProcess.map(log => log.transactionHash))];
+            const txDataMap = new Map();
+            
+            // Fetch all unique transactions in parallel (this is essential for ETH value)
+            const txPromises = uniqueTxHashes.map(async (txHash) => {
+                try {
+                    const txDetails = await this.rpcCall('eth_getTransactionByHash', [txHash], 'mainnet', 'low');
+                    return { txHash, txDetails };
+                } catch (error) {
+                    console.error(`Error fetching transaction ${txHash}:`, error.message);
+                    return { txHash, txDetails: null };
+                }
+            });
+            
+            const txResults = await Promise.all(txPromises);
+            txResults.forEach(({ txHash, txDetails }) => {
+                if (txDetails) {
+                    txDataMap.set(txHash, txDetails);
+                }
+            });
+            
             const trades = [];
             for (const log of logsToProcess) {
                 const from = '0x' + log.topics[1].slice(26);
                 const to = '0x' + log.topics[2].slice(26);
                 const amount = parseInt(log.data, 16);
                 
-                // OPTIMIZED: Get ONLY transaction details for 0G amounts (1 API call instead of 3!)
-                const txDetails = await this.rpcCall('eth_getTransactionByHash', [log.transactionHash], 'mainnet', 'low'); // LOW PRIORITY for historical trade details
+                // Get transaction details from cached data for ETH value calculation
+                const txDetails = txDataMap.get(log.transactionHash);
+                if (!txDetails) continue; // Skip if transaction data not available
                 
-                // Use current time as timestamp approximation (no extra API call)
-                const blockNumber = parseInt(log.blockNumber, 16);
-                const estimatedTimestamp = Math.floor(Date.now() / 1000);
-                
-                // Extract 0G/ETH amounts (no gas fees)
+                // Extract ETH value (this is very important for trade analysis!)
                 const ethValue = parseInt(txDetails.value, 16);
                 const ethValueFormatted = ethValue / Math.pow(10, 18);
                 
-                // Calculate price per token (no gas included)
+                // OPTIMIZATION: Skip transfers with 0 ETH value - these are just token transfers, not trades
+                if (ethValueFormatted === 0) {
+                    continue; // Skip non-trade transfers
+                }
+                
+                // Use current time as timestamp approximation (no extra API call)
+                const estimatedTimestamp = Math.floor(Date.now() / 1000);
+                
+                // Calculate price per token (only for actual trades with ETH value)
                 let pricePerToken = 0;
                 if (ethValueFormatted > 0 && amount > 0) {
                     pricePerToken = ethValueFormatted / (amount / Math.pow(10, tokenInfo.decimals));
                 }
                 
-                // Trade classification with 0G consideration
-                let type = 'transfer';
-                if (from === this.knownPatterns.zeroAddress) type = 'mint';
-                else if (to === this.knownPatterns.zeroAddress) type = 'burn';
-                else if (this.knownPatterns.highVolumeAddresses.has(from)) type = 'sell';
+                // Trade classification (only for actual trades)
+                let type = 'buy'; // Default to buy if ETH was spent
+                if (this.knownPatterns.highVolumeAddresses.has(from)) type = 'sell';
                 else if (this.knownPatterns.highVolumeAddresses.has(to)) type = 'buy';
-                else if (ethValueFormatted > 0) type = 'buy'; // If 0G was spent, likely a buy
                 
                 const classification = this.classifyTradeSize(amount, tokenInfo.totalSupply);
                 
                 trades.push({
                     transactionHash: log.transactionHash,
-                    blockNumber: blockNumber,
                     timestamp: estimatedTimestamp,
                     from: from.toLowerCase(),
                     to: to.toLowerCase(),
                     
-                    // Token amounts
-                    amount: amount,
+                    // Token amounts (only human-readable)
                     amountFormatted: amount / Math.pow(10, tokenInfo.decimals),
                     
-                    // 0G/ETH amounts (OPTIMIZED - No gas fees)
+                    // ETH amounts (only for actual trades)
                     ethValue: ethValue,
                     ethValueFormatted: ethValueFormatted,
-                    totalCost: ethValueFormatted, // Just 0G spent, no gas
                     pricePerToken: pricePerToken,
                     
                     // Classification
