@@ -42,7 +42,7 @@ class DEXTradeTracker {
         console.log(`🔴 WebSocket: ws://localhost:${this.wsPort}`);
     }
 
-    // RPC call to 0G node
+    // RPC call to 0G node - OPTIMIZED with 3s timeout
     async rpcCall(method, params = []) {
         return new Promise((resolve, reject) => {
             const data = JSON.stringify({
@@ -57,7 +57,8 @@ class DEXTradeTracker {
                 headers: {
                     'Content-Type': 'application/json',
                     'Content-Length': data.length
-                }
+                },
+                timeout: 3000 // 3 second timeout
             };
 
             const req = https.request(this.rpcUrl, options, (res) => {
@@ -75,6 +76,12 @@ class DEXTradeTracker {
                         reject(e);
                     }
                 });
+            });
+
+            // Set timeout for the request
+            req.setTimeout(3000, () => {
+                req.destroy();
+                reject(new Error(`RPC call timeout after 3 seconds: ${method}`));
             });
 
             req.on('error', reject);
@@ -162,17 +169,25 @@ class DEXTradeTracker {
         return Object.values(this.dexContracts).includes(address.toLowerCase());
     }
 
-    // Get all trades for a token from inception
+    // Get all trades for a token from inception - OPTIMIZED with limited block range
     async getAllTrades(tokenAddress, fromBlock = '0x0', limit = 1000) {
         try {
             const tokenInfo = await this.getTokenInfo(tokenAddress);
             const pairs = await this.findTokenPairs(tokenAddress);
             
-            console.log(`🔍 Scanning trades for ${tokenInfo.symbol} from block ${fromBlock}...`);
+            // OPTIMIZATION: Limit to last 1000 blocks for performance
+            let actualFromBlock = fromBlock;
+            if (fromBlock === '0x0') {
+                const latestBlock = await this.rpcCall('eth_blockNumber');
+                actualFromBlock = '0x' + Math.max(0, parseInt(latestBlock, 16) - 1000).toString(16);
+                console.log(`🔍 Scanning trades for ${tokenInfo.symbol} from block ${actualFromBlock} to latest (max 1000 blocks for performance)`);
+            } else {
+                console.log(`🔍 Scanning trades for ${tokenInfo.symbol} from block ${fromBlock}...`);
+            }
             
-            // Get all transfer events for the token
+            // Get transfer events for the token with timeout
             const logs = await this.rpcCall('eth_getLogs', [{
-                fromBlock: fromBlock,
+                fromBlock: actualFromBlock,
                 toBlock: 'latest',
                 address: tokenAddress,
                 topics: [this.eventSignatures.transfer]

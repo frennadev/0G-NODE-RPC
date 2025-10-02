@@ -43,7 +43,7 @@ class EnhancedTradeTracker {
         console.log(`🔴 WebSocket: ws://localhost:${this.wsPort}`);
     }
 
-    // RPC call to 0G node
+    // RPC call to 0G node - OPTIMIZED with 3s timeout
     async rpcCall(method, params = []) {
         return new Promise((resolve, reject) => {
             const data = JSON.stringify({
@@ -58,7 +58,8 @@ class EnhancedTradeTracker {
                 headers: {
                     'Content-Type': 'application/json',
                     'Content-Length': data.length
-                }
+                },
+                timeout: 3000 // 3 second timeout
             };
 
             const req = https.request(this.rpcUrl, options, (res) => {
@@ -76,6 +77,12 @@ class EnhancedTradeTracker {
                         reject(e);
                     }
                 });
+            });
+
+            // Set timeout for the request
+            req.setTimeout(3000, () => {
+                req.destroy();
+                reject(new Error(`RPC call timeout after 3 seconds: ${method}`));
             });
 
             req.on('error', reject);
@@ -160,16 +167,24 @@ class EnhancedTradeTracker {
         };
     }
 
-    // Get all transfers and classify them as trades
+    // Get all transfers and classify them as trades - OPTIMIZED with limited block range
     async getAllTrades(tokenAddress, fromBlock = '0x0', limit = 1000) {
         try {
             const tokenInfo = await this.getTokenInfo(tokenAddress);
             
-            console.log(`🔍 Scanning all transfers for ${tokenInfo.symbol} from block ${fromBlock}...`);
+            // OPTIMIZATION: Limit to last 1000 blocks for performance
+            let actualFromBlock = fromBlock;
+            if (fromBlock === '0x0') {
+                const latestBlock = await this.rpcCall('eth_blockNumber');
+                actualFromBlock = '0x' + Math.max(0, parseInt(latestBlock, 16) - 1000).toString(16);
+                console.log(`🔍 Scanning transfers for ${tokenInfo.symbol} from block ${actualFromBlock} to latest (max 1000 blocks for performance)`);
+            } else {
+                console.log(`🔍 Scanning transfers for ${tokenInfo.symbol} from block ${fromBlock}...`);
+            }
             
-            // Get all transfer events for the token
+            // Get transfer events for the token with timeout
             const logs = await this.rpcCall('eth_getLogs', [{
-                fromBlock: fromBlock,
+                fromBlock: actualFromBlock,
                 toBlock: 'latest',
                 address: tokenAddress,
                 topics: [this.eventSignatures.transfer]
@@ -186,18 +201,32 @@ class EnhancedTradeTracker {
                 };
             }
 
-            // Process transfers in batches
+            // Process transfers in parallel batches for better performance
             const transfers = [];
-            const batchSize = 100;
+            const batchSize = 50; // Smaller batches for parallel processing
+            const maxConcurrentBatches = 5; // Process up to 5 batches in parallel
             
+            const batches = [];
             for (let i = 0; i < Math.min(logs.length, limit); i += batchSize) {
-                const batch = logs.slice(i, i + batchSize);
-                const batchTransfers = await this.processTransferBatch(batch, tokenInfo);
-                transfers.push(...batchTransfers);
+                batches.push(logs.slice(i, i + batchSize));
+            }
+            
+            // Process batches in parallel with concurrency limit
+            for (let i = 0; i < batches.length; i += maxConcurrentBatches) {
+                const concurrentBatches = batches.slice(i, i + maxConcurrentBatches);
+                const batchPromises = concurrentBatches.map(batch => 
+                    this.processTransferBatch(batch, tokenInfo)
+                );
                 
-                // Progress logging
-                if (i % 200 === 0) {
-                    console.log(`📈 Processed ${i}/${Math.min(logs.length, limit)} transfers...`);
+                try {
+                    const batchResults = await Promise.all(batchPromises);
+                    batchResults.forEach(batchTransfers => transfers.push(...batchTransfers));
+                    
+                    // Progress logging
+                    console.log(`📈 Processed ${Math.min(i + maxConcurrentBatches, batches.length)}/${batches.length} batches...`);
+                } catch (error) {
+                    console.error('Error processing batch:', error);
+                    // Continue with other batches even if one fails
                 }
             }
 

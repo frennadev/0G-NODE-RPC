@@ -1,0 +1,72 @@
+# Fixed 0G Chain Node Dockerfile
+# Properly configures both Tendermint (consensus) and Geth (execution) layers
+
+FROM ubuntu:22.04
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    jq \
+    nginx \
+    supervisor \
+    net-tools \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy 0G binaries
+COPY aristotle-v1.0.0/bin/0gchaind /app/bin/
+COPY aristotle-v1.0.0/bin/geth /app/bin/
+RUN chmod +x /app/bin/*
+
+# Copy configuration files
+COPY aristotle-v1.0.0/geth-genesis.json /app/
+COPY aristotle-v1.0.0/kzg-trusted-setup.json /app/
+COPY aristotle-v1.0.0/0g-home/0gchaind-home/config/ /app/config/
+
+# Copy startup scripts
+COPY start-fixed-0g.sh /app/
+COPY test-0g-node.sh /app/
+COPY nginx-0g.conf /app/
+RUN chmod +x /app/*.sh
+
+# Create data directory
+RUN mkdir -p /data/0g-home/log
+
+# Create supervisor configuration
+RUN cat > /etc/supervisor/conf.d/0g-node.conf << 'EOF'
+[program:0g-node]
+command=/app/start-fixed-0g.sh
+directory=/app
+autostart=true
+autorestart=true
+stderr_logfile=/data/0g-home/log/0g-node-error.log
+stdout_logfile=/data/0g-home/log/0g-node-out.log
+user=root
+
+[program:nginx]
+command=nginx -g "daemon off;"
+autostart=true
+autorestart=true
+stderr_logfile=/data/0g-home/log/nginx-error.log
+stdout_logfile=/data/0g-home/log/nginx-out.log
+user=root
+EOF
+
+# Copy nginx config
+RUN cp /app/nginx-0g.conf /etc/nginx/nginx.conf
+
+# Expose ports
+EXPOSE 80 26657 8545 8546
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost/health && \
+        curl -f http://localhost:26657/status && \
+        curl -f -X POST http://localhost:8545 \
+        -H "Content-Type: application/json" \
+        -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+
+# Start supervisor
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]

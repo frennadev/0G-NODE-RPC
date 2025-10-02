@@ -241,7 +241,7 @@ class UnifiedOGService {
         });
     }
     
-    // Direct RPC call (used by queue processor)
+    // Direct RPC call (used by queue processor) - OPTIMIZED with 3s timeout
     async makeDirectRpcCall(method, params = [], network = 'mainnet') {
         return new Promise((resolve, reject) => {
             const data = JSON.stringify({
@@ -264,7 +264,8 @@ class UnifiedOGService {
                 headers: {
                     'Content-Type': 'application/json',
                     'Content-Length': data.length
-                }
+                },
+                timeout: 3000 // 3 second timeout
             };
 
             const req = https.request(targetUrl, options, (res) => {
@@ -297,6 +298,16 @@ class UnifiedOGService {
                 });
             });
 
+            // Set timeout for the request
+            req.setTimeout(3000, () => {
+                req.destroy();
+                const timeoutError = new Error(`RPC call timeout after 3 seconds: ${method}`);
+                if (selectedEndpoint) {
+                    this.markRpcEndpointFailed(targetUrl, timeoutError);
+                }
+                reject(timeoutError);
+            });
+
             req.on('error', (error) => {
                 // Mark endpoint as failed for connection errors
                 if (selectedEndpoint) {
@@ -309,15 +320,24 @@ class UnifiedOGService {
         });
     }
 
-    // Get token information
+    // Get token information - OPTIMIZED with single batch RPC call
     async getTokenInfo(tokenAddress) {
         try {
-            const [name, symbol, decimals, totalSupply] = await Promise.all([
-                this.rpcCall('eth_call', [{ to: tokenAddress, data: '0x06fdde03' }, 'latest']),
-                this.rpcCall('eth_call', [{ to: tokenAddress, data: '0x95d89b41' }, 'latest']),
-                this.rpcCall('eth_call', [{ to: tokenAddress, data: '0x313ce567' }, 'latest']),
-                this.rpcCall('eth_call', [{ to: tokenAddress, data: '0x18160ddd' }, 'latest'])
-            ]);
+            // Use batch RPC call to get all token info in one request
+            const batchData = [
+                { jsonrpc: '2.0', method: 'eth_call', params: [{ to: tokenAddress, data: '0x06fdde03' }, 'latest'], id: 1 },
+                { jsonrpc: '2.0', method: 'eth_call', params: [{ to: tokenAddress, data: '0x95d89b41' }, 'latest'], id: 2 },
+                { jsonrpc: '2.0', method: 'eth_call', params: [{ to: tokenAddress, data: '0x313ce567' }, 'latest'], id: 3 },
+                { jsonrpc: '2.0', method: 'eth_call', params: [{ to: tokenAddress, data: '0x18160ddd' }, 'latest'], id: 4 }
+            ];
+
+            const batchResponse = await this.makeBatchRpcCall(batchData);
+            
+            // Extract results from batch response
+            const name = batchResponse.find(r => r.id === 1)?.result || '0x';
+            const symbol = batchResponse.find(r => r.id === 2)?.result || '0x';
+            const decimals = batchResponse.find(r => r.id === 3)?.result || '0x';
+            const totalSupply = batchResponse.find(r => r.id === 4)?.result || '0x';
 
             return {
                 address: tokenAddress.toLowerCase(),
@@ -331,6 +351,55 @@ class UnifiedOGService {
         }
     }
 
+    // Batch RPC call for multiple requests in one HTTP call
+    async makeBatchRpcCall(requests) {
+        return new Promise((resolve, reject) => {
+            const data = JSON.stringify(requests);
+            const selectedEndpoint = this.getNextRpcEndpoint();
+            const targetUrl = selectedEndpoint.url;
+
+            const options = {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Content-Length': data.length
+                },
+                timeout: 3000 // 3 second timeout
+            };
+
+            const req = https.request(targetUrl, options, (res) => {
+                let body = '';
+                res.on('data', (chunk) => body += chunk);
+                res.on('end', () => {
+                    try {
+                        const response = JSON.parse(body);
+                        if (Array.isArray(response)) {
+                            resolve(response);
+                        } else if (response.error) {
+                            reject(new Error(response.error.message));
+                        } else {
+                            resolve([response]);
+                        }
+                    } catch (e) {
+                        reject(e);
+                    }
+                });
+            });
+
+            // Set timeout for the request
+            req.setTimeout(3000, () => {
+                req.destroy();
+                reject(new Error('Batch RPC call timeout after 3 seconds'));
+            });
+
+            req.on('error', (error) => {
+                reject(error);
+            });
+            req.write(data);
+            req.end();
+        });
+    }
+
     // Decode ABI-encoded string
     decodeString(hex) {
         if (!hex || hex === '0x') return '';
@@ -342,14 +411,16 @@ class UnifiedOGService {
         }
     }
 
-    // Get token trades (simplified version for unified service)
+    // Get token trades (simplified version for unified service) - OPTIMIZED with limited block range
     async getTokenTrades(tokenAddress, limit = 100) {
         try {
             const tokenInfo = await this.getTokenInfo(tokenAddress);
             
-            // Get recent transfer events
+            // Get recent transfer events - LIMITED to last 1000 blocks for performance
             const latestBlock = await this.rpcCall('eth_blockNumber');
             const fromBlock = '0x' + Math.max(0, parseInt(latestBlock, 16) - 1000).toString(16);
+            
+            console.log(`🔍 Scanning trades for ${tokenInfo.symbol} from block ${fromBlock} to latest (max 1000 blocks)`);
             
             const logs = await this.rpcCall('eth_getLogs', [{
                 fromBlock: fromBlock,

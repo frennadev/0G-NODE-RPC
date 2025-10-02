@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # 0G Chain Node with both layers
+  og-node:
+    build:
+      context: ..
+      dockerfile: Dockerfile.fixed
+    ports:
+      - "26657:26657"  # Tendermint RPC
+      - "8545:8545"    # Geth RPC
+      - "8546:8546"    # Geth WebSocket
+      - "80:80"        # Nginx proxy
+    volumes:
+      - og-data:/data
+    environment:
+      - NODE_NAME=test-0g-node
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+  # Test client
+  test-client:
+    image: curlimages/curl:latest
+    depends_on:
+      og-node:
+        condition: service_healthy
+    command: |
+      sh -c "
+        echo '🧪 Testing 0G Chain Node...'
+        echo ''
+        echo '1. Testing consensus layer...'
+        curl -s http://og-node:26657/status | jq '.result.sync_info.latest_block_height' || echo 'Failed'
+        echo ''
+        echo '2. Testing execution layer...'
+        curl -s -X POST http://og-node:8545 \
+          -H 'Content-Type: application/json' \
+          -d '{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}' | jq '.result' || echo 'Failed'
+        echo ''
+        echo '3. Testing token info...'
+        curl -s -X POST http://og-node:8545 \
+          -H 'Content-Type: application/json' \
+          -d '{\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x59ef6F3943bBdFE2fB19565037Ac85071223E94C\",\"data\":\"0x06fdde03\"},\"latest\"],\"id\":1}' | jq '.result' || echo 'Failed'
+        echo ''
+        echo '4. Testing event logs...'
+        curl -s -X POST http://og-node:8545 \
+          -H 'Content-Type: application/json' \
+          -d '{\"jsonrpc\":\"2.0\",\"method\":\"eth_getLogs\",\"params\":[{\"fromBlock\":\"latest\",\"toBlock\":\"latest\",\"topics\":[\"0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef\"]}],\"id\":1}' | jq '.result | length' || echo 'Failed'
+        echo ''
+        echo '✅ All tests completed!'
+      "
+
+volumes:
+  og-data:
