@@ -227,7 +227,7 @@ class DEXTradeTracker {
         }
     }
 
-    // Process a batch of transfers to identify trades
+    // Process a batch of transfers to identify trades - OPTIMIZED with batch RPC calls
     async processTradeBatch(logs, tokenInfo, pairs) {
         const trades = [];
         const txGroups = new Map();
@@ -240,10 +240,58 @@ class DEXTradeTracker {
             txGroups.get(log.transactionHash).push(log);
         }
 
-        // Process each transaction
+        // OPTIMIZATION: Batch fetch all transaction data at once
+        const txHashes = Array.from(txGroups.keys());
+        const txDataMap = new Map();
+        const blockDataMap = new Map();
+
+        // Fetch all transaction data in parallel
+        const txPromises = txHashes.map(async (txHash) => {
+            try {
+                const [tx, receipt] = await Promise.all([
+                    this.rpcCall('eth_getTransactionByHash', [txHash]),
+                    this.rpcCall('eth_getTransactionReceipt', [txHash])
+                ]);
+                return { txHash, tx, receipt };
+            } catch (error) {
+                console.error(`Error fetching transaction ${txHash}:`, error.message);
+                return { txHash, tx: null, receipt: null };
+            }
+        });
+
+        const txResults = await Promise.all(txPromises);
+        txResults.forEach(({ txHash, tx, receipt }) => {
+            if (tx && receipt) {
+                txDataMap.set(txHash, { tx, receipt });
+            }
+        });
+
+        // Get unique block hashes and fetch block data
+        const uniqueBlockHashes = [...new Set(txResults
+            .filter(r => r.tx)
+            .map(r => r.tx.blockHash))];
+        
+        const blockPromises = uniqueBlockHashes.map(async (blockHash) => {
+            try {
+                const block = await this.rpcCall('eth_getBlockByHash', [blockHash, false]);
+                return { blockHash, block };
+            } catch (error) {
+                console.error(`Error fetching block ${blockHash}:`, error.message);
+                return { blockHash, block: null };
+            }
+        });
+
+        const blockResults = await Promise.all(blockPromises);
+        blockResults.forEach(({ blockHash, block }) => {
+            if (block) {
+                blockDataMap.set(blockHash, block);
+            }
+        });
+
+        // Process each transaction with cached data
         for (const [txHash, txLogs] of txGroups) {
             try {
-                const trade = await this.analyzeTrade(txHash, txLogs, tokenInfo, pairs);
+                const trade = await this.analyzeTrade(txHash, txLogs, tokenInfo, pairs, txDataMap, blockDataMap);
                 if (trade) {
                     trades.push(trade);
                 }
@@ -255,18 +303,35 @@ class DEXTradeTracker {
         return trades;
     }
 
-    // Analyze a transaction to determine if it's a trade
-    async analyzeTrade(txHash, logs, tokenInfo, pairs) {
+    // Analyze a transaction to determine if it's a trade - OPTIMIZED with cached data
+    async analyzeTrade(txHash, logs, tokenInfo, pairs, txDataMap = null, blockDataMap = null) {
         try {
-            // Get transaction details
-            const tx = await this.rpcCall('eth_getTransactionByHash', [txHash]);
-            const receipt = await this.rpcCall('eth_getTransactionReceipt', [txHash]);
+            // Get transaction details - use cached data if available
+            let tx, receipt;
+            if (txDataMap && txDataMap.has(txHash)) {
+                const data = txDataMap.get(txHash);
+                tx = data.tx;
+                receipt = data.receipt;
+            } else {
+                // Fallback: fetch if not cached
+                [tx, receipt] = await Promise.all([
+                    this.rpcCall('eth_getTransactionByHash', [txHash]),
+                    this.rpcCall('eth_getTransactionReceipt', [txHash])
+                ]);
+            }
             
             if (!tx || !receipt) return null;
 
-            // Get block details for timestamp
-            const block = await this.rpcCall('eth_getBlockByHash', [tx.blockHash, false]);
-            const timestamp = parseInt(block.timestamp, 16);
+            // Get block details for timestamp - use cached data if available
+            let timestamp = 0;
+            if (blockDataMap && blockDataMap.has(tx.blockHash)) {
+                const block = blockDataMap.get(tx.blockHash);
+                timestamp = parseInt(block.timestamp, 16);
+            } else {
+                // Fallback: fetch if not cached
+                const block = await this.rpcCall('eth_getBlockByHash', [tx.blockHash, false]);
+                timestamp = parseInt(block.timestamp, 16);
+            }
 
             // Analyze the logs to determine trade details
             const tradeAnalysis = this.analyzeTradeFromLogs(logs, tokenInfo, pairs);

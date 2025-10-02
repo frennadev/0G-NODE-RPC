@@ -253,13 +253,36 @@ class EnhancedTradeTracker {
         }
     }
 
-    // Process a batch of transfer logs
+    // Process a batch of transfer logs - OPTIMIZED with block caching
     async processTransferBatch(logs, tokenInfo) {
         const transfers = [];
         
+        // OPTIMIZATION: Get unique block hashes and fetch all block data at once
+        const uniqueBlockHashes = [...new Set(logs.map(log => log.blockHash))];
+        const blockDataMap = new Map();
+        
+        // Fetch all unique blocks in parallel
+        const blockPromises = uniqueBlockHashes.map(async (blockHash) => {
+            try {
+                const block = await this.rpcCall('eth_getBlockByHash', [blockHash, false]);
+                return { blockHash, block };
+            } catch (error) {
+                console.error(`Error fetching block ${blockHash}:`, error.message);
+                return { blockHash, block: null };
+            }
+        });
+        
+        const blockResults = await Promise.all(blockPromises);
+        blockResults.forEach(({ blockHash, block }) => {
+            if (block) {
+                blockDataMap.set(blockHash, block);
+            }
+        });
+        
+        // Process transfers with cached block data
         for (const log of logs) {
             try {
-                const transfer = await this.processTransfer(log, tokenInfo);
+                const transfer = await this.processTransfer(log, tokenInfo, blockDataMap);
                 if (transfer) {
                     transfers.push(transfer);
                 }
@@ -271,16 +294,23 @@ class EnhancedTradeTracker {
         return transfers;
     }
 
-    // Process individual transfer
-    async processTransfer(log, tokenInfo) {
+    // Process individual transfer - OPTIMIZED with cached block data
+    async processTransfer(log, tokenInfo, blockDataMap = null) {
         try {
             const from = '0x' + log.topics[1].slice(26);
             const to = '0x' + log.topics[2].slice(26);
             const amount = parseInt(log.data, 16);
             
-            // Get block details for timestamp
-            const block = await this.rpcCall('eth_getBlockByHash', [log.blockHash, false]);
-            const timestamp = parseInt(block.timestamp, 16);
+            // Get block details for timestamp - use cached data if available
+            let timestamp = 0;
+            if (blockDataMap && blockDataMap.has(log.blockHash)) {
+                const block = blockDataMap.get(log.blockHash);
+                timestamp = parseInt(block.timestamp, 16);
+            } else {
+                // Fallback: fetch block if not cached (shouldn't happen with optimization)
+                const block = await this.rpcCall('eth_getBlockByHash', [log.blockHash, false]);
+                timestamp = parseInt(block.timestamp, 16);
+            }
             
             return {
                 transactionHash: log.transactionHash,
